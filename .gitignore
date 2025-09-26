@@ -1,0 +1,20 @@
+# Backend
+backend-pos/node_modules/
+backend-pos/.env
+backend-pos/logs/
+backend-pos/*.log
+
+# Frontend Flutter
+frontend-pos/build/
+frontend-pos/.dart_tool/
+frontend-pos/.pub-cache/
+frontend-pos/.pub/
+frontend-pos/.flutter-plugins
+frontend-pos/.flutter-plugins-dependencies
+frontend-pos/.metadata
+
+# Archivos generales
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
