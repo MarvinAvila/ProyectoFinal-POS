@@ -1,18 +1,19 @@
 // src/controllers/usuarioController.js
-const db = require('../config/database');
-const bcrypt = require('bcrypt');
-
-const SALT_ROUNDS = 10;
-const ALLOWED_ROLES = ['admin', 'cajero', 'gerente', 'dueno'];
+const db = require("../config/database");
+const Usuario = require("../models/Usuario");
+const responseHelper = require("../utils/responseHelper");
+const logger = require("../utils/logger");
+const QueryBuilder = require("../utils/queryBuilder");
 
 const usuarioController = {
-  // Listado con paginación y búsqueda
   async getAll(req, res) {
+    const client = await db.connect();
     try {
-      const page = Math.max(parseInt(req.query.page || '1'), 1);
-      const limit = Math.min(parseInt(req.query.limit || '20'), 100);
+      const page = Math.max(parseInt(req.query.page || "1"), 1);
+      const limit = Math.min(parseInt(req.query.limit || "20"), 100);
       const offset = (page - 1) * limit;
-      const q = req.query.q ? `%${req.query.q}%` : null;
+      
+      const q = req.query.q ? QueryBuilder.sanitizeSearchTerm(req.query.q) : null;
       const rol = req.query.rol || null;
 
       const whereClauses = [];
@@ -30,15 +31,15 @@ const usuarioController = {
         idx++;
       }
 
-      const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+      const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
-      // total
-      const countRes = await db.query(`SELECT COUNT(*)::int AS total FROM usuarios ${whereSQL}`, params);
+      // Obtener total
+      const countRes = await client.query(`SELECT COUNT(*)::int AS total FROM usuarios ${whereSQL}`, params);
       const total = countRes.rows[0].total;
 
-      // data
-      params.push(limit, offset); // last two params
-      const dataRes = await db.query(
+      // Obtener datos
+      params.push(limit, offset);
+      const dataRes = await client.query(
         `SELECT id_usuario, nombre, correo, rol, activo, creado_en
          FROM usuarios
          ${whereSQL}
@@ -47,120 +48,136 @@ const usuarioController = {
         params
       );
 
-      return res.status(200).json({
-        success: true,
-        data: dataRes.rows,
+      // ✅ USAR MODELO para transformar los resultados
+      const usuarios = dataRes.rows.map(row => Usuario.fromDatabaseRow(row));
+      
+      // ✅ Usar métodos del modelo para enriquecer la respuesta
+      const usuariosConInfo = usuarios.map(usuario => ({
+        ...usuario.toJSON(),
+        es_administrador: usuario.esAdministrador(),
+        puede_asignar_roles: usuario.getRolesAsignables().length > 0
+      }));
+
+      logger.api("Listado de usuarios obtenido exitosamente", {
+        total: total,
+        page: page,
+        limit: limit,
+        resultados: usuarios.length,
+        usuarioConsulta: req.user?.id_usuario
+      });
+
+      return responseHelper.success(res, {
+        data: usuariosConInfo,
         meta: { total, page, limit, pages: Math.ceil(total / limit) }
       });
-    } catch (error) {
-      console.error('usuarioController.getAll error:', error);
-      return res.status(500).json({ success: false, message: 'Error obteniendo usuarios' });
-    }
-  },
 
-  async getById(req, res) {
-    const { id } = req.params;
-    try {
-      const result = await db.query(
-        'SELECT id_usuario, nombre, correo, rol, activo, creado_en FROM usuarios WHERE id_usuario = $1',
-        [id]
-      );
-      if (result.rowCount === 0) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
-      return res.json({ success: true, data: result.rows[0] });
     } catch (error) {
-      console.error('usuarioController.getById error:', error);
-      return res.status(500).json({ success: false, message: 'Error obteniendo usuario' });
+      logger.error("Error en usuarioController.getAll", error);
+      return responseHelper.error(res, "Error obteniendo usuarios", 500, error);
+    } finally {
+      client.release();
     }
   },
 
   async create(req, res) {
-    const { nombre, correo, contrasena, rol } = req.body;
-    if (!nombre || !correo || !contrasena) {
-      return res.status(400).json({ success: false, message: 'Nombre, correo y contraseña son obligatorios' });
-    }
-    if (rol && !ALLOWED_ROLES.includes(rol)) {
-      return res.status(400).json({ success: false, message: `Rol inválido. Permitidos: ${ALLOWED_ROLES.join(', ')}` });
-    }
+    const client = await db.connect();
     try {
-      const hash = await bcrypt.hash(contrasena, SALT_ROUNDS);
-      const result = await db.query(
+      await client.query('BEGIN');
+      
+      const { nombre, correo, contrasena, rol } = req.body;
+      
+      // ✅ USAR VALIDACIÓN DEL MODELO
+      const validationErrors = Usuario.validate({ nombre, correo, contrasena, rol });
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join(', '));
+      }
+
+      // ✅ USAR MÉTODO ESTÁTICO PARA CREAR USUARIO
+      const nuevoUsuario = await Usuario.crear(nombre, correo, contrasena, rol || "cajero");
+      
+      // Insertar en la base de datos
+      const result = await client.query(
         `INSERT INTO usuarios (nombre, correo, contrasena_hash, rol) 
-         VALUES ($1,$2,$3,$4)
+         VALUES ($1, $2, $3, $4)
          RETURNING id_usuario, nombre, correo, rol, activo, creado_en`,
-        [nombre, correo, hash, rol || 'cajero']
+        [nuevoUsuario.nombre, nuevoUsuario.correo, nuevoUsuario.contrasena_hash, nuevoUsuario.rol]
       );
-      return res.status(201).json({ success: true, data: result.rows[0] });
+
+      await client.query('COMMIT');
+
+      // ✅ CREAR INSTANCIA DEL MODELO CON LA RESPUESTA DE LA BD
+      const usuarioCreado = Usuario.fromDatabaseRow(result.rows[0]);
+      
+      logger.audit("Usuario creado exitosamente", req.user?.id_usuario, "CREATE", {
+        nuevoUsuarioId: usuarioCreado.id_usuario,
+        rol: usuarioCreado.rol,
+        correo: usuarioCreado.correo
+      });
+
+      return responseHelper.success(res, usuarioCreado.toJSON(), "Usuario creado exitosamente", 201);
+
     } catch (error) {
-      console.error('usuarioController.create error:', error);
-      // Unique violation (correo)
-      if (error.code === '23505') {
-        return res.status(409).json({ success: false, message: 'El correo ya está registrado' });
+      await client.query('ROLLBACK');
+      
+      logger.error("Error en usuarioController.create", {
+        error: error.message,
+        datosSolicitud: { 
+          nombre: req.body.nombre,
+          correo: req.body.correo,
+          rol: req.body.rol 
+        },
+        usuarioCreador: req.user?.id_usuario
+      });
+      
+      if (error.message.includes('obligatorio') || 
+          error.message.includes('debe tener') || 
+          error.message.includes('no es válido')) {
+        return responseHelper.error(res, error.message, 400, error);
       }
-      return res.status(500).json({ success: false, message: 'Error creando usuario' });
+      
+      if (error.code === "23505") {
+        return responseHelper.conflict(res, "El correo electrónico ya está registrado");
+      }
+      
+      return responseHelper.error(res, "Error creando usuario", 500, error);
+    } finally {
+      client.release();
     }
   },
 
-  async update(req, res) {
-    const { id } = req.params;
-    const { nombre, correo, contrasena, rol, activo } = req.body;
+  async login(req, res) {
+    // Este método iría en authController, pero lo muestro como ejemplo
+    const { correo, contrasena } = req.body;
+    
     try {
-      // Build dynamic update
-      const fields = [];
-      const params = [];
-      let idx = 1;
-
-      if (nombre !== undefined) { fields.push(`nombre=$${idx}`); params.push(nombre); idx++; }
-      if (correo !== undefined) { fields.push(`correo=$${idx}`); params.push(correo); idx++; }
-      if (rol !== undefined) {
-        if (!ALLOWED_ROLES.includes(rol)) return res.status(400).json({ success: false, message: 'Rol inválido' });
-        fields.push(`rol=$${idx}`); params.push(rol); idx++;
-      }
-      if (activo !== undefined) { fields.push(`activo=$${idx}`); params.push(activo); idx++; }
-      if (contrasena !== undefined) {
-        const hash = await bcrypt.hash(contrasena, SALT_ROUNDS);
-        fields.push(`contrasena_hash=$${idx}`); params.push(hash); idx++;
+      const result = await db.query(
+        'SELECT * FROM usuarios WHERE correo = $1 AND activo = true',
+        [correo.toLowerCase()]
+      );
+      
+      if (result.rowCount === 0) {
+        return responseHelper.unauthorized(res, "Credenciales inválidas");
       }
 
-      if (fields.length === 0) {
-        return res.status(400).json({ success: false, message: 'No hay campos para actualizar' });
+      // ✅ USAR MODELO Y SUS MÉTODOS
+      const usuario = Usuario.fromDatabaseRow(result.rows[0]);
+      const contrasenaValida = await usuario.verificarContrasena(contrasena);
+      
+      if (!contrasenaValida) {
+        return responseHelper.unauthorized(res, "Credenciales inválidas");
       }
 
-      params.push(id);
-      const sql = `UPDATE usuarios SET ${fields.join(', ')} WHERE id_usuario=$${idx} RETURNING id_usuario, nombre, correo, rol, activo, creado_en`;
-      const result = await db.query(sql, params);
-      if (result.rowCount === 0) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
-      return res.json({ success: true, data: result.rows[0] });
+      // Generar token JWT (esto iría en authController)
+      const token = generarToken(usuario);
+      
+      return responseHelper.success(res, {
+        usuario: usuario.toJSON(),
+        token: token
+      }, "Login exitoso");
+
     } catch (error) {
-      console.error('usuarioController.update error:', error);
-      if (error.code === '23505') {
-        return res.status(409).json({ success: false, message: 'El correo ya está en uso' });
-      }
-      return res.status(500).json({ success: false, message: 'Error actualizando usuario' });
-    }
-  },
-
-  async setActive(req, res) {
-    const { id } = req.params;
-    const { activo } = req.body;
-    try {
-      const result = await db.query('UPDATE usuarios SET activo=$1 WHERE id_usuario=$2 RETURNING id_usuario, nombre, correo, rol, activo', [!!activo, id]);
-      if (result.rowCount === 0) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
-      return res.json({ success: true, data: result.rows[0] });
-    } catch (error) {
-      console.error('usuarioController.setActive error:', error);
-      return res.status(500).json({ success: false, message: 'Error actualizando estado de usuario' });
-    }
-  },
-
-  async delete(req, res) {
-    const { id } = req.params;
-    try {
-      const result = await db.query('DELETE FROM usuarios WHERE id_usuario=$1 RETURNING id_usuario', [id]);
-      if (result.rowCount === 0) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
-      return res.json({ success: true, message: 'Usuario eliminado' });
-    } catch (error) {
-      console.error('usuarioController.delete error:', error);
-      return res.status(500).json({ success: false, message: 'Error eliminando usuario' });
+      logger.error("Error en proceso de login", error);
+      return responseHelper.error(res, "Error en el login", 500, error);
     }
   }
 };

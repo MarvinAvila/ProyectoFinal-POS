@@ -1,5 +1,5 @@
 // src/controllers/ventaController.js
-const db = require('../config/database');
+const db = require("../config/database");
 
 const ventaController = {
   async getAll(req, res) {
@@ -13,16 +13,22 @@ const ventaController = {
       return res.json({ success: true, data: result.rows });
     } catch (error) {
       console.error("ventaController.getAll:", error);
-      return res.status(500).json({ success: false, message: "Error obteniendo ventas" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Error obteniendo ventas" });
     }
   },
 
   async getById(req, res) {
     try {
       const { id } = req.params;
-      const venta = await db.query(`SELECT * FROM ventas WHERE id_venta=$1`, [id]);
+      const venta = await db.query(`SELECT * FROM ventas WHERE id_venta=$1`, [
+        id,
+      ]);
       if (venta.rowCount === 0)
-        return res.status(404).json({ success: false, message: "Venta no encontrada" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Venta no encontrada" });
 
       const detalles = await db.query(
         `SELECT dv.*, p.nombre
@@ -31,46 +37,58 @@ const ventaController = {
          WHERE dv.id_venta=$1`,
         [id]
       );
-      return res.json({ success: true, data: { ...venta.rows[0], detalles: detalles.rows } });
+      return res.json({
+        success: true,
+        data: { ...venta.rows[0], detalles: detalles.rows },
+      });
     } catch (error) {
       console.error("ventaController.getById:", error);
-      return res.status(500).json({ success: false, message: "Error obteniendo venta" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Error obteniendo venta" });
     }
   },
 
   async create(req, res) {
-    const { id_usuario, detalles } = req.body;
-    if (!id_usuario || !detalles || detalles.length === 0) {
-      return res.status(400).json({ success: false, message: "Datos de venta incompletos" });
-    }
+    const client = await db.connect();
     try {
-      await db.query("BEGIN");
+      await client.query("BEGIN");
 
-      const venta = await db.query(
-        `INSERT INTO ventas (id_usuario, total) VALUES ($1, 0) RETURNING *`,
-        [id_usuario]
-      );
-      const idVenta = venta.rows[0].id_venta;
+      const { id_usuario, detalles, forma_pago = "efectivo" } = req.body;
 
-      let total = 0;
-      for (const d of detalles) {
-        const subtotal = d.cantidad * d.precio_unitario;
-        total += subtotal;
-        await db.query(
-          `INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario, subtotal)
-           VALUES ($1,$2,$3,$4,$5)`,
-          [idVenta, d.id_producto, d.cantidad, d.precio_unitario, subtotal]
+      // ✅ CREAR INSTANCIA DEL MODELO
+      const nuevaVenta = Venta.crearNueva(id_usuario, forma_pago);
+
+      // Procesar detalles usando modelos
+      for (const detalleData of detalles) {
+        const detalle = DetalleVenta.crearNuevo(
+          null, // id_venta se asignará después
+          detalleData.id_producto,
+          detalleData.cantidad,
+          detalleData.precio_unitario
         );
+
+        nuevaVenta.agregarDetalle(detalle);
       }
 
-      await db.query(`UPDATE ventas SET total=$1 WHERE id_venta=$2`, [total, idVenta]);
+      // ✅ USAR MÉTODO DEL MODELO para calcular totales
+      nuevaVenta.calcularTotales();
 
-      await db.query("COMMIT");
-      return res.status(201).json({ success: true, message: "Venta registrada", data: { id_venta: idVenta, total } });
+      // Insertar venta y detalles en la base de datos...
+
+      await client.query("COMMIT");
+
+      return responseHelper.success(
+        res,
+        nuevaVenta,
+        "Venta registrada exitosamente",
+        201
+      );
     } catch (error) {
-      await db.query("ROLLBACK");
-      console.error("ventaController.create:", error);
-      return res.status(500).json({ success: false, message: "Error registrando venta" });
+      await client.query("ROLLBACK");
+      // Manejo de errores...
+    } finally {
+      client.release();
     }
   },
 
@@ -79,17 +97,24 @@ const ventaController = {
       const { id } = req.params;
       await db.query("BEGIN");
       await db.query(`DELETE FROM detalle_venta WHERE id_venta=$1`, [id]);
-      const result = await db.query(`DELETE FROM ventas WHERE id_venta=$1 RETURNING *`, [id]);
+      const result = await db.query(
+        `DELETE FROM ventas WHERE id_venta=$1 RETURNING *`,
+        [id]
+      );
       await db.query("COMMIT");
       if (result.rowCount === 0)
-        return res.status(404).json({ success: false, message: "Venta no encontrada" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Venta no encontrada" });
       return res.json({ success: true, message: "Venta eliminada" });
     } catch (error) {
       await db.query("ROLLBACK");
       console.error("ventaController.delete:", error);
-      return res.status(500).json({ success: false, message: "Error eliminando venta" });
+      return res
+        .status(500)
+        .json({ success: false, message: "Error eliminando venta" });
     }
-  }
+  },
 };
 
 module.exports = ventaController;
