@@ -11,7 +11,7 @@ router.use(authMiddleware.verifyToken);
 
 // GET /comprobantes - Obtener todos los comprobantes con paginación y filtros
 router.get('/',
-    validation.comprobante.query,
+    comprobanteValidations.query,
     validation.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
     comprobanteController.getAll
@@ -25,14 +25,14 @@ router.get('/estadisticas',
 
 // GET /comprobantes/venta/:id_venta - Obtener comprobantes por venta
 router.get('/venta/:id_venta',
-    validation.comprobante.getByVenta,
+    comprobanteValidations.getByVenta,
     validation.handleValidationErrors,
     comprobanteController.getByVenta
 );
 
 // GET /comprobantes/tipo/:tipo - Obtener comprobantes por tipo
 router.get('/tipo/:tipo',
-    validation.comprobante.getByTipo,
+    comprobanteValidations.getByTipo,
     validation.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
     comprobanteController.getByTipo
@@ -40,21 +40,21 @@ router.get('/tipo/:tipo',
 
 // GET /comprobantes/:id - Obtener comprobante por ID (sin contenido)
 router.get('/:id',
-    validation.comprobante.getById,
+    comprobanteValidations.getById,
     validation.handleValidationErrors,
     comprobanteController.getById
 );
 
 // GET /comprobantes/:id/contenido - Obtener contenido del comprobante
 router.get('/:id/contenido',
-    validation.comprobante.getById,
+    comprobanteValidations.getById,
     validation.handleValidationErrors,
     comprobanteController.getContenido
 );
 
 // GET /comprobantes/:id/descargar - Descargar comprobante
 router.get('/:id/descargar',
-    validation.comprobante.getById,
+    comprobanteValidations.getById,
     validation.handleValidationErrors,
     comprobanteController.descargarComprobante
 );
@@ -63,21 +63,21 @@ router.get('/:id/descargar',
 
 // POST /comprobantes - Crear nuevo comprobante
 router.post('/',
-    validation.comprobante.create,
+    comprobanteValidations.create,
     validation.handleValidationErrors,
     comprobanteController.create
 );
 
 // POST /comprobantes/generar-ticket - Generar ticket automático
 router.post('/generar-ticket',
-    validation.comprobante.generarTicket,
+    comprobanteValidations.generarTicket,
     validation.handleValidationErrors,
     comprobanteController.generarTicketAutomatico
 );
 
 // POST /comprobantes/generar-factura - Generar factura automática
 router.post('/generar-factura',
-    validation.comprobante.generarFactura,
+    comprobanteValidations.generarFactura,
     validation.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente']),
     comprobanteController.generarFactura
@@ -87,7 +87,7 @@ router.post('/generar-factura',
 
 // DELETE /comprobantes/:id - Eliminar comprobante
 router.delete('/:id',
-    validation.comprobante.delete,
+    comprobanteValidations.delete,
     validation.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'dueno']),
     comprobanteController.delete
@@ -95,7 +95,7 @@ router.delete('/:id',
 
 // POST /comprobantes/:id/reenviar - Reenviar comprobante por email
 router.post('/:id/reenviar',
-    validation.comprobante.reenviar,
+    comprobanteValidations.reenviar,
     validation.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente']),
     comprobanteController.reenviarComprobante

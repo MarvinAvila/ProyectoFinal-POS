@@ -9,10 +9,8 @@ const authValidations = {
             .withMessage('Debe proporcionar un correo electrónico válido'),
         
         body('contrasena')
-            .isLength({ min: 6 })
-            .withMessage('La contraseña debe tener al menos 6 caracteres')
-            .trim()
-            .escape()
+            .isLength({ min: 1 })
+            .withMessage('La contraseña es requerida')
     ],
     
     // Validaciones para registro de usuarios
@@ -31,26 +29,66 @@ const authValidations = {
         body('contrasena')
             .isLength({ min: 6 })
             .withMessage('La contraseña debe tener al menos 6 caracteres')
-            .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-            .withMessage('La contraseña debe contener al menos una mayúscula, una minúscula y un número'),
-        
-        body('rol')
-            .optional()
-            .isIn(['admin', 'cajero', 'gerente', 'dueno'])
-            .withMessage('Rol no válido')
     ],
     
     // Validaciones para cambio de contraseña
     changePassword: [
         body('currentPassword')
-            .isLength({ min: 6 })
-            .withMessage('La contraseña actual debe tener al menos 6 caracteres'),
+            .isLength({ min: 1 })
+            .withMessage('La contraseña actual es requerida'),
         
         body('newPassword')
             .isLength({ min: 6 })
             .withMessage('La nueva contraseña debe tener al menos 6 caracteres')
-            .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-            .withMessage('La nueva contraseña debe contener al menos una mayúscula, una minúscula y un número')
+    ],
+    
+    // Validaciones para recuperación de contraseña
+    forgotPassword: [
+        body('correo')
+            .isEmail()
+            .normalizeEmail()
+            .withMessage('Debe proporcionar un correo electrónico válido')
+    ],
+    
+    // Validaciones para reset de contraseña
+    resetPassword: [
+        body('token')
+            .isLength({ min: 1 })
+            .withMessage('El token es requerido'),
+        
+        body('newPassword')
+            .isLength({ min: 6 })
+            .withMessage('La nueva contraseña debe tener al menos 6 caracteres')
+    ],
+    
+    // Validaciones para actualizar perfil
+    updateProfile: [
+        body('nombre')
+            .optional()
+            .isLength({ min: 2, max: 100 })
+            .withMessage('El nombre debe tener entre 2 y 100 caracteres')
+            .trim()
+            .escape(),
+        
+        body('correo')
+            .optional()
+            .isEmail()
+            .normalizeEmail()
+            .withMessage('Debe proporcionar un correo electrónico válido')
+    ],
+    
+    // Validaciones para actualizar estado de usuario (temporal - básica)
+    updateUserStatus: [
+        body('activo')
+            .isBoolean()
+            .withMessage('El estado activo debe ser true o false')
+    ],
+    
+    // Validaciones para actualizar rol de usuario (temporal - básica)
+    updateUserRole: [
+        body('rol')
+            .isIn(['admin', 'cajero', 'gerente', 'dueno'])
+            .withMessage('Rol no válido')
     ],
     
     // Middleware para manejar resultados de validación

@@ -11,21 +11,21 @@ router.use(authMiddleware.verifyToken);
 
 // GET /detalle-venta - Obtener todos los detalles (con filtros opcionales)
 router.get('/',
-    validation.detalleVenta.query,
+    detalleVentaValidations.query,
     validation.handleValidationErrors,
     detalleVentaController.getAll
 );
 
 // GET /detalle-venta/venta/:id_venta - Obtener detalles por venta específica
 router.get('/venta/:id_venta',
-    validation.detalleVenta.getByVenta,
+    detalleVentaValidations.getByVenta,
     validation.handleValidationErrors,
     detalleVentaController.getByVenta
 );
 
 // GET /detalle-venta/producto/:id_producto - Obtener detalles por producto
 router.get('/producto/:id_producto',
-    validation.detalleVenta.getByProducto,
+    detalleVentaValidations.getByProducto,
     validation.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
     detalleVentaController.getByProducto
@@ -33,14 +33,14 @@ router.get('/producto/:id_producto',
 
 // GET /detalle-venta/:id - Obtener detalle por ID
 router.get('/:id',
-    validation.detalleVenta.getById,
+    detalleVentaValidations.getById,
     validation.handleValidationErrors,
     detalleVentaController.getById
 );
 
 // GET /detalle-venta/estadisticas/producto/:id_producto - Estadísticas de ventas por producto
 router.get('/estadisticas/producto/:id_producto',
-    validation.detalleVenta.getByProducto,
+    detalleVentaValidations.getByProducto,
     validation.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
     detalleVentaController.getEstadisticasProducto
@@ -48,7 +48,7 @@ router.get('/estadisticas/producto/:id_producto',
 
 // GET /detalle-venta/estadisticas/venta/:id_venta - Resumen estadístico de una venta
 router.get('/estadisticas/venta/:id_venta',
-    validation.detalleVenta.getByVenta,
+    detalleVentaValidations.getByVenta,
     validation.handleValidationErrors,
     detalleVentaController.getEstadisticasVenta
 );
@@ -57,35 +57,35 @@ router.get('/estadisticas/venta/:id_venta',
 
 // POST /detalle-venta - Crear nuevo detalle de venta
 router.post('/',
-    validation.detalleVenta.create,
+    detalleVentaValidations.create,
     validation.handleValidationErrors,
     detalleVentaController.create
 );
 
 // POST /detalle-venta/multiple - Crear múltiples detalles de venta
 router.post('/multiple',
-    validation.detalleVenta.createMultiple,
+    detalleVentaValidations.createMultiple,
     validation.handleValidationErrors,
     detalleVentaController.createMultiple
 );
 
 // PUT /detalle-venta/:id - Actualizar detalle de venta
 router.put('/:id',
-    validation.detalleVenta.update,
+    detalleVentaValidations.update,
     validation.handleValidationErrors,
     detalleVentaController.update
 );
 
 // PATCH /detalle-venta/:id - Actualización parcial del detalle
 router.patch('/:id',
-    validation.detalleVenta.patch,
+    detalleVentaValidations.patch,
     validation.handleValidationErrors,
     detalleVentaController.patch
 );
 
 // DELETE /detalle-venta/:id - Eliminar detalle de venta
 router.delete('/:id',
-    validation.detalleVenta.delete,
+    detalleVentaValidations.delete,
     validation.handleValidationErrors,
     detalleVentaController.delete
 );
@@ -95,7 +95,7 @@ router.delete('/:id',
 // GET /detalle-venta/reporte/ventas-productos - Reporte de ventas por productos
 router.get('/reporte/ventas-productos',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    validation.detalleVenta.reporteVentasProductos,
+    detalleVentaValidations.reporteVentasProductos,
     validation.handleValidationErrors,
     detalleVentaController.getReporteVentasProductos
 );
@@ -103,14 +103,14 @@ router.get('/reporte/ventas-productos',
 // GET /detalle-venta/reporte/top-productos - Top productos más vendidos
 router.get('/reporte/top-productos',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    validation.detalleVenta.reporteTopProductos,
+    detalleVentaValidations.reporteTopProductos,
     validation.handleValidationErrors,
     detalleVentaController.getReporteTopProductos
 );
 
 // POST /detalle-venta/validar-stock - Validar stock antes de crear detalle
 router.post('/validar-stock',
-    validation.detalleVenta.validarStock,
+    detalleVentaValidations.validarStock,
     validation.handleValidationErrors,
     detalleVentaController.validarStock
 );

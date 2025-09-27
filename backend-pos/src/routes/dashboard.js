@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
 const authMiddleware = require('../middleware/auth');
-const validation = require('../middleware/validation');
+const dashboardValidations = require('../middleware/validation/dashboard'); // ← Importación directa
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware.verifyToken);
@@ -24,8 +24,8 @@ router.get('/metricas-rapidas',
 // GET /dashboard/estadisticas-avanzadas - Estadísticas detalladas por periodo
 router.get('/estadisticas-avanzadas',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    validation.dashboard.estadisticasAvanzadas,
-    validation.handleValidationErrors,
+    dashboardValidations.estadisticasAvanzadas, // ← Usar directamente
+    dashboardValidations.handleValidationErrors,
     dashboardController.getEstadisticasAvanzadas
 );
 
@@ -40,8 +40,8 @@ router.get('/alertas',
 // GET /dashboard/ventas - Datos específicos de ventas
 router.get('/ventas',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    validation.dashboard.ventas,
-    validation.handleValidationErrors,
+    dashboardValidations.ventas, // ← Usar directamente
+    dashboardValidations.handleValidationErrors,
     dashboardController.getDatosVentas
 );
 
@@ -54,8 +54,8 @@ router.get('/inventario',
 // GET /dashboard/finanzas - Métricas financieras
 router.get('/finanzas',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    validation.dashboard.finanzas,
-    validation.handleValidationErrors,
+    dashboardValidations.finanzas, // ← Usar directamente
+    dashboardValidations.handleValidationErrors,
     dashboardController.getMetricasFinancieras
 );
 
@@ -90,16 +90,16 @@ router.get('/reporte-alertas',
 // POST /dashboard/exportar - Exportar datos del dashboard
 router.post('/exportar',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    validation.dashboard.exportar,
-    validation.handleValidationErrors,
+    dashboardValidations.exportar, // ← Usar directamente
+    dashboardValidations.handleValidationErrors,
     dashboardController.exportarDashboard
 );
 
 // GET /dashboard/exportar-plantilla - Descargar plantilla de reporte
 router.get('/exportar-plantilla/:tipo',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    validation.dashboard.exportarPlantilla,
-    validation.handleValidationErrors,
+    dashboardValidations.exportarPlantilla, // ← Usar directamente
+    dashboardValidations.handleValidationErrors,
     dashboardController.descargarPlantillaReporte
 );
 
