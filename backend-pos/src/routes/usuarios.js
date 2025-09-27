@@ -21,6 +21,9 @@ router.put('/:id', authMiddleware.requireRole(['admin', 'dueno']), usuarioContro
 // PATCH /usuarios/:id/active - Activar/desactivar usuario
 router.patch('/:id/active', authMiddleware.requireRole(['admin', 'dueno']), usuarioController.setActive);
 
+// PATCH /usuarios/:id/password - Cambiar contraseña
+router.patch('/:id/password', authMiddleware.requireRole(['admin', 'dueno']), usuarioController.changePassword);
+
 // DELETE /usuarios/:id - Eliminar usuario
 router.delete('/:id', authMiddleware.requireRole(['admin', 'dueno']), usuarioController.delete);
 

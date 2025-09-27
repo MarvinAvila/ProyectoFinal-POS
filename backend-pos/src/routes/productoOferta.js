@@ -12,6 +12,9 @@ router.get('/', productoOfertaController.getAll);
 // GET /producto-oferta/producto/:id_producto - Obtener ofertas por producto
 router.get('/producto/:id_producto', productoOfertaController.getOffersByProduct);
 
+// GET /producto-oferta/producto/:id_producto/activas - Obtener ofertas activas por producto
+router.get('/producto/:id_producto/activas', productoOfertaController.getActiveOffersByProduct);
+
 // GET /producto-oferta/oferta/:id_oferta - Obtener productos por oferta
 router.get('/oferta/:id_oferta', productoOfertaController.getProductsByOffer);
 
