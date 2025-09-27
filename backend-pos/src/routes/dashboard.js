@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
 const authMiddleware = require('../middleware/auth');
-const dashboardValidations = require('../middleware/validation/dashboard'); // ← Importación directa
+const dashboardValidations = require('../middleware/validation/dashboard');
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware.verifyToken);
@@ -24,7 +24,7 @@ router.get('/metricas-rapidas',
 // GET /dashboard/estadisticas-avanzadas - Estadísticas detalladas por periodo
 router.get('/estadisticas-avanzadas',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    dashboardValidations.estadisticasAvanzadas, // ← Usar directamente
+    ...dashboardValidations.estadisticasAvanzadas, // ← Agregar spread operator
     dashboardValidations.handleValidationErrors,
     dashboardController.getEstadisticasAvanzadas
 );
@@ -40,7 +40,7 @@ router.get('/alertas',
 // GET /dashboard/ventas - Datos específicos de ventas
 router.get('/ventas',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    dashboardValidations.ventas, // ← Usar directamente
+    ...dashboardValidations.ventas, // ← Agregar spread operator
     dashboardValidations.handleValidationErrors,
     dashboardController.getDatosVentas
 );
@@ -54,7 +54,7 @@ router.get('/inventario',
 // GET /dashboard/finanzas - Métricas financieras
 router.get('/finanzas',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    dashboardValidations.finanzas, // ← Usar directamente
+    ...dashboardValidations.finanzas, // ← Agregar spread operator
     dashboardValidations.handleValidationErrors,
     dashboardController.getMetricasFinancieras
 );
@@ -90,7 +90,7 @@ router.get('/reporte-alertas',
 // POST /dashboard/exportar - Exportar datos del dashboard
 router.post('/exportar',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    dashboardValidations.exportar, // ← Usar directamente
+    ...dashboardValidations.exportar, // ← Agregar spread operator
     dashboardValidations.handleValidationErrors,
     dashboardController.exportarDashboard
 );
@@ -98,7 +98,7 @@ router.post('/exportar',
 // GET /dashboard/exportar-plantilla - Descargar plantilla de reporte
 router.get('/exportar-plantilla/:tipo',
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
-    dashboardValidations.exportarPlantilla, // ← Usar directamente
+    ...dashboardValidations.exportarPlantilla, // ← Agregar spread operator
     dashboardValidations.handleValidationErrors,
     dashboardController.descargarPlantillaReporte
 );

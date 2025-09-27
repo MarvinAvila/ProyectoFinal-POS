@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const comprobanteController = require('../controllers/comprobanteController');
 const authMiddleware = require('../middleware/auth');
-const validation = require('../middleware/validation');
+// CORREGIR: Cambiar 'validation' por 'comprobanteValidations'
+const comprobanteValidations = require('../middleware/validation/comprobante');
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware.verifyToken);
@@ -11,8 +12,8 @@ router.use(authMiddleware.verifyToken);
 
 // GET /comprobantes - Obtener todos los comprobantes con paginación y filtros
 router.get('/',
-    comprobanteValidations.query,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.query, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
     comprobanteController.getAll
 );
@@ -25,37 +26,37 @@ router.get('/estadisticas',
 
 // GET /comprobantes/venta/:id_venta - Obtener comprobantes por venta
 router.get('/venta/:id_venta',
-    comprobanteValidations.getByVenta,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.getByVenta, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     comprobanteController.getByVenta
 );
 
 // GET /comprobantes/tipo/:tipo - Obtener comprobantes por tipo
 router.get('/tipo/:tipo',
-    comprobanteValidations.getByTipo,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.getByTipo, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente', 'dueno']),
     comprobanteController.getByTipo
 );
 
 // GET /comprobantes/:id - Obtener comprobante por ID (sin contenido)
 router.get('/:id',
-    comprobanteValidations.getById,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.getById, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     comprobanteController.getById
 );
 
 // GET /comprobantes/:id/contenido - Obtener contenido del comprobante
 router.get('/:id/contenido',
-    comprobanteValidations.getById,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.getById, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     comprobanteController.getContenido
 );
 
 // GET /comprobantes/:id/descargar - Descargar comprobante
 router.get('/:id/descargar',
-    comprobanteValidations.getById,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.getById, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     comprobanteController.descargarComprobante
 );
 
@@ -63,22 +64,22 @@ router.get('/:id/descargar',
 
 // POST /comprobantes - Crear nuevo comprobante
 router.post('/',
-    comprobanteValidations.create,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.create, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     comprobanteController.create
 );
 
 // POST /comprobantes/generar-ticket - Generar ticket automático
 router.post('/generar-ticket',
-    comprobanteValidations.generarTicket,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.generarTicket, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     comprobanteController.generarTicketAutomatico
 );
 
 // POST /comprobantes/generar-factura - Generar factura automática
 router.post('/generar-factura',
-    comprobanteValidations.generarFactura,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.generarFactura, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente']),
     comprobanteController.generarFactura
 );
@@ -87,16 +88,16 @@ router.post('/generar-factura',
 
 // DELETE /comprobantes/:id - Eliminar comprobante
 router.delete('/:id',
-    comprobanteValidations.delete,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.delete, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'dueno']),
     comprobanteController.delete
 );
 
 // POST /comprobantes/:id/reenviar - Reenviar comprobante por email
 router.post('/:id/reenviar',
-    comprobanteValidations.reenviar,
-    validation.handleValidationErrors,
+    ...comprobanteValidations.reenviar, // ← Agregar spread operator
+    comprobanteValidations.handleValidationErrors,
     authMiddleware.requireRole(['admin', 'gerente']),
     comprobanteController.reenviarComprobante
 );
