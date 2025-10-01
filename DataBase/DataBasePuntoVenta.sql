@@ -15,7 +15,8 @@ CREATE TABLE usuarios (
     contrasena_hash TEXT NOT NULL,
     rol VARCHAR(50) NOT NULL CHECK (rol IN ('admin', 'cajero', 'gerente', 'dueno')),
     activo BOOLEAN DEFAULT TRUE,
-    creado_en TIMESTAMP DEFAULT NOW()
+    creado_en TIMESTAMP DEFAULT NOW(),
+    ultimo_login TIMESTAMP
 );
 
 -- =====================================
