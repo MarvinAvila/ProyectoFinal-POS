@@ -8,7 +8,7 @@ const helpers = require('../utils/helpers');
 
 const productoController = {
     async getAll(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { 
                 q, 
@@ -153,7 +153,7 @@ const productoController = {
     },
 
     async getById(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const id = QueryBuilder.validateId(req.params.id);
 
@@ -222,7 +222,7 @@ const productoController = {
     },
 
     async create(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -349,7 +349,7 @@ const productoController = {
     },
 
     async update(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
 
@@ -470,7 +470,7 @@ const productoController = {
     },
 
     async delete(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
 
@@ -542,7 +542,7 @@ const productoController = {
     },
 
     async getStats(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const stats = await client.query(`
                 SELECT 

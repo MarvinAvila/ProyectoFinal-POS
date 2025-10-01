@@ -7,7 +7,7 @@ const helpers = require("../utils/helpers");
 
 const usuarioController = {
   async getAll(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const { 
         q, 
@@ -114,7 +114,7 @@ const usuarioController = {
   },
 
   async getById(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const id = QueryBuilder.validateId(req.params.id);
 
@@ -169,7 +169,7 @@ const usuarioController = {
   },
 
   async create(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query('BEGIN');
       
@@ -266,7 +266,7 @@ const usuarioController = {
   },
 
   async update(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query('BEGIN');
 
@@ -376,7 +376,7 @@ const usuarioController = {
   },
 
   async setActive(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query('BEGIN');
 
@@ -443,7 +443,7 @@ const usuarioController = {
   },
 
   async delete(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query('BEGIN');
 
@@ -517,7 +517,7 @@ const usuarioController = {
   },
 
   async changePassword(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query('BEGIN');
 

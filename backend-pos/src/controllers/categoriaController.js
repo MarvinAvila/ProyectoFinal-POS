@@ -346,7 +346,7 @@ const categoriaController = {
     },
 
     async patch(req, res) {
-        const transaction = await db.connect();
+        const transaction = await db.getClient();
         try {
             await transaction.query('BEGIN');
 
@@ -427,7 +427,7 @@ const categoriaController = {
     },
 
     async moverProductos(req, res) {
-        const transaction = await db.connect();
+        const transaction = await db.getClient();
         try {
             await transaction.query('BEGIN');
 

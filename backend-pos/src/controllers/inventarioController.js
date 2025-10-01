@@ -7,7 +7,7 @@ const HistorialInventario = require('../models/HistorialInventario');
 
 const inventarioController = {
     async historial(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { id_producto, page = 1, limit = 50, motivo, tipo, fecha_inicio, fecha_fin } = req.query;
             
@@ -123,7 +123,7 @@ const inventarioController = {
     },
 
     async ajuste(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -229,7 +229,7 @@ const inventarioController = {
     },
 
     async estadisticas(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { fecha_inicio, fecha_fin } = req.query;
             

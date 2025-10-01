@@ -7,7 +7,7 @@ const helpers = require('../utils/helpers');
 
 const productoOfertaController = {
     async getAll(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { activa, page = 1, limit = 50 } = req.query;
             const { page: pageNum, limit: limitNum, offset } = helpers.getPaginationParams(req.query);
@@ -77,7 +77,7 @@ const productoOfertaController = {
     },
 
     async getOffersByProduct(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { id_producto } = req.params;
             const { page = 1, limit = 50, solo_activas } = req.query;
@@ -156,7 +156,7 @@ const productoOfertaController = {
     },
 
     async getProductsByOffer(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { id_oferta } = req.params;
             const { page = 1, limit = 50, con_precio = 'true' } = req.query;
@@ -234,7 +234,7 @@ const productoOfertaController = {
     },
 
     async assign(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -327,7 +327,7 @@ const productoOfertaController = {
     },
 
     async unassign(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -391,7 +391,7 @@ const productoOfertaController = {
     },
 
     async getActiveOffersByProduct(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { id_producto } = req.params;
 

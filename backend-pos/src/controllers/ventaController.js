@@ -169,7 +169,7 @@ const ventaController = {
   },
 
   async create(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
     
     try {
       await transaction.query('BEGIN');
@@ -315,7 +315,7 @@ const ventaController = {
   },
 
   async delete(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
     
     try {
       await transaction.query('BEGIN');

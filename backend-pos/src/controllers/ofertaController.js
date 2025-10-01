@@ -133,7 +133,7 @@ const ofertaController = {
   },
 
   async create(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
     
     try {
       await transaction.query('BEGIN');
@@ -216,7 +216,7 @@ const ofertaController = {
   },
 
   async update(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
     
     try {
       await transaction.query('BEGIN');
@@ -324,7 +324,7 @@ const ofertaController = {
   },
 
   async delete(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
     
     try {
       await transaction.query('BEGIN');
@@ -384,7 +384,7 @@ const ofertaController = {
   },
 
   async asignarProducto(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
     
     try {
       await transaction.query('BEGIN');
@@ -473,7 +473,7 @@ const ofertaController = {
   },
 
   async desasignarProducto(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
     
     try {
       await transaction.query('BEGIN');

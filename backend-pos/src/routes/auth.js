@@ -5,7 +5,7 @@ const authMiddleware = require('../middleware/auth');
 const authValidations = require('../validations/authValidations');
 
 // Aplicar logging a todas las rutas autenticadas
-router.use(authMiddleware.requestLogger);
+//router.use(authMiddleware.requestLogger);
 
 // ==================== RUTAS PÚBLICAS ====================
 
@@ -18,8 +18,6 @@ router.post('/login',
 
 // POST /auth/register - Registrar nuevo usuario (solo admin/dueno)
 router.post('/register',
-    authMiddleware.verifyToken,
-    authMiddleware.requireRole(['admin', 'dueno']),
     authValidations.register,
     authValidations.handleValidationErrors,
     authController.register

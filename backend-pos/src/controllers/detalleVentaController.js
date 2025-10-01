@@ -137,7 +137,7 @@ const detalleVentaController = {
   },
 
   async create(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
 
     try {
       await transaction.query("BEGIN");
@@ -314,7 +314,7 @@ const detalleVentaController = {
   },
 
   async update(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
 
     try {
       await transaction.query("BEGIN");
@@ -534,7 +534,7 @@ const detalleVentaController = {
   },
 
   async delete(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
 
     try {
       await transaction.query("BEGIN");
@@ -782,7 +782,7 @@ const detalleVentaController = {
   },
 
   async createMultiple(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
 
     try {
       await transaction.query("BEGIN");
@@ -967,7 +967,7 @@ const detalleVentaController = {
   },
 
   async patch(req, res) {
-    const transaction = await db.connect();
+    const transaction = await db.getClient();
 
     try {
       await transaction.query("BEGIN");

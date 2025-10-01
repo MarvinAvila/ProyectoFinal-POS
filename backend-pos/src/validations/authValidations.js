@@ -33,11 +33,11 @@ const authValidations = {
     
     // Validaciones para cambio de contraseña
     changePassword: [
-        body('currentPassword')
+        body('contrasena_actual')
             .isLength({ min: 1 })
             .withMessage('La contraseña actual es requerida'),
-        
-        body('newPassword')
+
+        body('nueva_contrasena')
             .isLength({ min: 6 })
             .withMessage('La nueva contraseña debe tener al menos 6 caracteres')
     ],

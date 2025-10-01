@@ -13,7 +13,7 @@ const authMiddleware = {
      * Extrae y valida el token del header Authorization
      */
     verifyToken: async (req, res, next) => {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             // Obtener token del header
             const authHeader = req.header('Authorization');
@@ -275,7 +275,7 @@ const authMiddleware = {
      * (redundante con verifyToken pero útil para rutas no protegidas por token)
      */
     requireActive: async (req, res, next) => {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             if (!req.user || !req.user.id_usuario) {
                 return responseHelper.unauthorized(res, 'Autenticación requerida');

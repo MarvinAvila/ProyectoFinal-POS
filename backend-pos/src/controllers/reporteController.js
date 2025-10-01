@@ -6,7 +6,7 @@ const QueryBuilder = require('../utils/queryBuilder');
 
 const reporteController = {
     async getAll(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { tipo, fecha_inicio, fecha_fin, page = 1, limit = 20 } = req.query;
             
@@ -100,7 +100,7 @@ const reporteController = {
     },
 
     async getById(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { id } = req.params;
 
@@ -150,7 +150,7 @@ const reporteController = {
     },
 
     async generarReporte(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -386,7 +386,7 @@ const reporteController = {
     },
 
     async getEstadisticasReportes(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { fecha_inicio, fecha_fin } = req.query;
 
@@ -466,7 +466,7 @@ const reporteController = {
     },
 
     async delete(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             

@@ -6,7 +6,7 @@ const QueryBuilder = require('../utils/queryBuilder');
 
 const comprobanteController = {
     async getByVenta(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { id_venta } = req.params;
 
@@ -54,7 +54,7 @@ const comprobanteController = {
     },
 
     async getContenido(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { id } = req.params;
 
@@ -104,7 +104,7 @@ const comprobanteController = {
     },
 
     async create(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -196,7 +196,7 @@ const comprobanteController = {
     },
 
     async generarTicketAutomatico(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -276,7 +276,7 @@ const comprobanteController = {
     },
 
     async getAll(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { page, limit, offset } = helpers.getPaginationParams(req.query);
             const { tipo, fecha_inicio, fecha_fin } = req.query;
@@ -356,7 +356,7 @@ const comprobanteController = {
     },
 
     async getById(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const id = QueryBuilder.validateId(req.params.id);
 
@@ -401,7 +401,7 @@ const comprobanteController = {
     },
 
     async getByTipo(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { tipo } = req.params;
             const { page, limit, offset } = helpers.getPaginationParams(req.query);
@@ -462,7 +462,7 @@ const comprobanteController = {
     },
 
     async descargarComprobante(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const id = QueryBuilder.validateId(req.params.id);
 
@@ -515,7 +515,7 @@ const comprobanteController = {
     },
 
     async generarFactura(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -597,7 +597,7 @@ const comprobanteController = {
     },
 
     async delete(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -649,7 +649,7 @@ const comprobanteController = {
     },
 
     async reenviarComprobante(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const id = QueryBuilder.validateId(req.params.id);
             const { email } = req.body;

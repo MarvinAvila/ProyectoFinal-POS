@@ -8,7 +8,7 @@ const Reporte = require("../models/Reporte");
 
 const dashboardController = {
   async getResumenCompleto(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query("BEGIN");
 
@@ -221,7 +221,7 @@ const dashboardController = {
   },
 
   async getMetricasRapidas(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       // Método optimizado para obtener solo las métricas más importantes
       const [
@@ -285,7 +285,7 @@ const dashboardController = {
   },
 
   async getEstadisticasAvanzadas(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const { periodo = "7d" } = req.query; // 7d, 30d, 90d, ytd
 
@@ -429,7 +429,7 @@ const dashboardController = {
   },
 
   async getAlertasDashboard(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       // Obtener alertas para el dashboard (prioridad alta)
       const alertasResult = await client.query(`
@@ -554,7 +554,7 @@ const dashboardController = {
   },
 
   async getDatosVentas(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const {
         tipo_grafico = "lineas",
@@ -703,7 +703,7 @@ const dashboardController = {
   },
 
   async getEstadoInventario(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       // Estadísticas generales de inventario
       const inventarioResult = await client.query(`
@@ -827,7 +827,7 @@ const dashboardController = {
   },
 
   async getMetricasFinancieras(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const {
         moneda = "MXN",
@@ -955,7 +955,7 @@ const dashboardController = {
   },
 
   async getEstadisticasUsuarios(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       // Estadísticas de usuarios
       const usuariosResult = await db.query(`
@@ -1092,7 +1092,7 @@ const dashboardController = {
   },
 
   async getReporteVentasDiarias(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const ventasHoyResult = await client.query(`
             SELECT 
@@ -1131,7 +1131,7 @@ const dashboardController = {
   },
 
   async getReporteStock(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const stockResult = await client.query(`
             SELECT 
@@ -1165,7 +1165,7 @@ const dashboardController = {
   },
 
   async getReporteAlertas(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const alertasResult = await client.query(`
             SELECT 

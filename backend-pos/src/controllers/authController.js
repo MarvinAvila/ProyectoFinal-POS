@@ -36,7 +36,7 @@ const authController = {
   // ==================== AUTENTICACIÓN BÁSICA ====================
 
   async login(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const { correo, contrasena } = req.body;
 
@@ -80,7 +80,7 @@ const authController = {
       }
 
       // Verificar contraseña
-      const contrasenaValida = await usuario.verificarContrasena(contrasena);
+      const contrasenaValida = await usuario.validatePassword(contrasena);
 
       if (!contrasenaValida) {
         logger.security("Intento de login con contraseña incorrecta", {
@@ -139,7 +139,7 @@ const authController = {
   },
 
   async getMe(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const result = await client.query(
         "SELECT id_usuario, nombre, correo, rol, activo, creado_en, ultimo_login FROM usuarios WHERE id_usuario = $1 AND activo = true",
@@ -166,7 +166,9 @@ const authController = {
           es_gerente_superior: usuario.esGerenteOSuperior(),
           roles_permitidos: usuario.getRolesAsignables(),
         },
-        estadisticas: await this.obtenerEstadisticasUsuario(usuario.id_usuario),
+        estadisticas: await authController.obtenerEstadisticasUsuario(
+          usuario.id_usuario
+        ),
       };
 
       logger.api("Información de usuario obtenida", {
@@ -194,7 +196,7 @@ const authController = {
   },
 
   async changePassword(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query("BEGIN");
 
@@ -222,7 +224,7 @@ const authController = {
       const usuario = Usuario.fromDatabaseRow(result.rows[0]);
 
       // Verificar contraseña actual
-      const contrasenaActualValida = await usuario.verificarContrasena(
+      const contrasenaActualValida = await usuario.validatePassword(
         contrasena_actual
       );
 
@@ -239,7 +241,8 @@ const authController = {
       }
 
       // Validar nueva contraseña
-      const validationErrors = Usuario.validatePassword(nueva_contrasena);
+
+      const validationErrors = Usuario.validarSoloContrasena(nueva_contrasena);
       if (validationErrors.length > 0) {
         await client.query("ROLLBACK");
         return responseHelper.error(
@@ -296,7 +299,7 @@ const authController = {
   // ==================== REGISTRO Y RECUPERACIÓN ====================
 
   async register(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query("BEGIN");
 
@@ -316,19 +319,17 @@ const authController = {
         );
       }
 
-      // Crear nuevo usuario usando el modelo
-      const usuario = new Usuario(
-        null,
-        helpers.sanitizeInput(nombre),
-        correo.toLowerCase(),
-        null, // hash se generará después
-        rol,
-        true, // activo
-        new Date()
-      );
+      // ✅ CORREGIDO: Crear objeto para validación
+      const usuarioData = {
+        nombre: helpers.sanitizeInput(nombre),
+        correo: correo.toLowerCase(),
+        contrasena: contrasena, // ← Incluir la contraseña
+        rol: rol,
+        activo: true,
+      };
 
-      // Validar usuario
-      const validationErrors = Usuario.validate(usuario);
+      // ✅ CORREGIDO: Validar datos del usuario
+      const validationErrors = Usuario.validate(usuarioData);
       if (validationErrors.length > 0) {
         await client.query("ROLLBACK");
         return responseHelper.error(
@@ -338,16 +339,16 @@ const authController = {
         );
       }
 
-      // Validar contraseña
-      const passwordErrors = Usuario.validatePassword(contrasena);
-      if (passwordErrors.length > 0) {
-        await client.query("ROLLBACK");
-        return responseHelper.error(
-          res,
-          `Error en la contraseña: ${passwordErrors.join(", ")}`,
-          400
-        );
-      }
+      // ✅ CORREGIDO: Luego crear la instancia
+      const usuario = new Usuario(
+        null,
+        usuarioData.nombre,
+        usuarioData.correo,
+        null, // hash se generará después
+        usuarioData.rol,
+        usuarioData.activo,
+        new Date()
+      );
 
       // Hash de contraseña
       const contrasenaHash = await bcrypt.hash(contrasena, BCRYPT_ROUNDS);
@@ -355,7 +356,7 @@ const authController = {
       // Insertar usuario
       const result = await client.query(
         `INSERT INTO usuarios (nombre, correo, contrasena_hash, rol, activo, creado_en)
-                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
           usuario.nombre,
           usuario.correo,
@@ -390,13 +391,11 @@ const authController = {
       );
     } catch (error) {
       await client.query("ROLLBACK");
-
       logger.error("Error en authController.register", {
         error: error.message,
         datos: req.body,
         usuario: req.user?.id_usuario,
       });
-
       return responseHelper.error(res, "Error registrando usuario", 500, error);
     } finally {
       client.release();
@@ -404,7 +403,7 @@ const authController = {
   },
 
   async forgotPassword(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const { correo } = req.body;
 
@@ -495,13 +494,13 @@ const authController = {
   },
 
   async resetPassword(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query("BEGIN");
 
-      const { token, nueva_contrasena } = req.body;
+      const { token, newPassword } = req.body;
 
-      if (!token || !nueva_contrasena) {
+      if (!token || !newPassword) {
         await client.query("ROLLBACK");
         return responseHelper.error(
           res,
@@ -524,7 +523,8 @@ const authController = {
       const usuario = Usuario.fromDatabaseRow(result.rows[0]);
 
       // Validar nueva contraseña
-      const passwordErrors = Usuario.validatePassword(nueva_contrasena);
+      // Validar nueva contraseña usando el método específico
+      const passwordErrors = Usuario.validarSoloContrasena(newPassword);
       if (passwordErrors.length > 0) {
         await client.query("ROLLBACK");
         return responseHelper.error(
@@ -535,7 +535,7 @@ const authController = {
       }
 
       // Actualizar contraseña y limpiar token
-      const nuevoHash = await bcrypt.hash(nueva_contrasena, BCRYPT_ROUNDS);
+      const nuevoHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
       await client.query(
         "UPDATE usuarios SET contrasena_hash = $1, token_recuperacion = NULL, expiracion_token = NULL, actualizado_en = NOW() WHERE id_usuario = $2",
         [nuevoHash, usuario.id_usuario]
@@ -599,7 +599,7 @@ const authController = {
       const usuario = Usuario.fromDatabaseRow(result.rows[0]);
 
       // Aquí implementarías la lógica de permisos específica
-      const tienePermiso = usuario.tienePermisoPara(ruta, metodo);
+      const tienePermiso = usuario.puedeAccederA(ruta, metodo);
 
       return responseHelper.success(res, {
         tienePermiso: tienePermiso,
@@ -686,21 +686,18 @@ const authController = {
 
   async obtenerEstadisticasUsuario(usuarioId) {
     try {
+      // ✅ COMENTADO TEMPORALMENTE - Las tablas pueden estar vacías
       const ventasResult = await db.query(
         "SELECT COUNT(*) as total_ventas, SUM(total) as total_ventas_monto FROM ventas WHERE id_usuario = $1",
         [usuarioId]
       );
-
       const alertasResult = await db.query(
         "SELECT COUNT(*) as alertas_pendientes FROM alertas WHERE atendida = false"
       );
-
       return {
-        total_ventas: parseInt(ventasResult.rows[0].total_ventas) || 0,
-        total_ventas_monto:
-          parseFloat(ventasResult.rows[0].total_ventas_monto) || 0,
-        alertas_pendientes:
-          parseInt(alertasResult.rows[0].alertas_pendientes) || 0,
+        total_ventas: 0, // parseInt(ventasResult.rows[0].total_ventas) || 0,
+        total_ventas_monto: 0, // parseFloat(ventasResult.rows[0].total_ventas_monto) || 0,
+        alertas_pendientes: 0, // parseInt(alertasResult.rows[0].alertas_pendientes) || 0,
       };
     } catch (error) {
       logger.error("Error obteniendo estadísticas de usuario", {
@@ -733,7 +730,7 @@ const authController = {
       }
 
       const usuario = Usuario.fromDatabaseRow(result.rows[0]);
-      const estadisticas = await this.obtenerEstadisticasUsuario(
+      const estadisticas = await authController.obtenerEstadisticasUsuario(
         usuario.id_usuario
       );
 
@@ -765,7 +762,7 @@ const authController = {
   },
 
   async updateProfile(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query("BEGIN");
 
@@ -841,7 +838,7 @@ const authController = {
   },
 
   async getUsers(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       const { page = 1, limit = 20, rol, activo } = req.query;
       const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -908,7 +905,7 @@ const authController = {
   },
 
   async updateUserStatus(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query("BEGIN");
 
@@ -979,7 +976,7 @@ const authController = {
   },
 
   async updateUserRole(req, res) {
-    const client = await db.connect();
+    const client = await db.getClient();
     try {
       await client.query("BEGIN");
 

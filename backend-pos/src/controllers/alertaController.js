@@ -7,7 +7,7 @@ const helpers = require('../utils/helpers');
 
 const alertaController = {
     async getAll(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { tipo, atendida, page = 1, limit = 50 } = req.query;
             const { page: pageNum, limit: limitNum, offset } = helpers.getPaginationParams(req.query);
@@ -91,7 +91,7 @@ const alertaController = {
     },
 
     async getPendientes(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const result = await client.query(
                 `SELECT a.*, p.nombre as producto_nombre, p.codigo_barra, p.stock, p.fecha_caducidad
@@ -129,7 +129,7 @@ const alertaController = {
     },
 
     async getById(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const id = QueryBuilder.validateId(req.params.id);
 
@@ -173,7 +173,7 @@ const alertaController = {
     },
 
     async marcarAtendida(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -242,7 +242,7 @@ const alertaController = {
     },
 
     async crearAlertaStockBajo(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -333,7 +333,7 @@ const alertaController = {
     },
 
     async delete(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             await client.query('BEGIN');
             
@@ -385,7 +385,7 @@ const alertaController = {
     },
 
     async getEstadisticas(req, res) {
-        const client = await db.connect();
+        const client = await db.getClient();
         try {
             const { dias = 30 } = req.query;
 
