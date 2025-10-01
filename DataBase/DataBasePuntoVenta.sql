@@ -16,7 +16,10 @@ CREATE TABLE usuarios (
     rol VARCHAR(50) NOT NULL CHECK (rol IN ('admin', 'cajero', 'gerente', 'dueno')),
     activo BOOLEAN DEFAULT TRUE,
     creado_en TIMESTAMP DEFAULT NOW(),
-    ultimo_login TIMESTAMP
+    ultimo_login TIMESTAMP,
+    token_recuperacion  	text,
+	expiracion_token  	timestamp,
+	actualizado_en  	timestamp default now(),
 );
 
 -- =====================================
