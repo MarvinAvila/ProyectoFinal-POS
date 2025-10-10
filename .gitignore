@@ -37,3 +37,27 @@ Thumbs.db
 .env.staging
 *.tmp
 *.temp
+
+
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
+# Android build files
+android/.gradle/
+android/app/build/
+build/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/App.framework
+
+# Other
+*.log
