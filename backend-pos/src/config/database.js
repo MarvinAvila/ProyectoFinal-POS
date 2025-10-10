@@ -2,17 +2,27 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Crear el pool de conexiones
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_NAME || 'punto_venta',
-  max: 20,            // máximo de conexiones en el pool
-  idleTimeoutMillis: 30000, // tiempo de inactividad antes de cerrar conexión
-  connectionTimeoutMillis: 5000 // tiempo máximo para intentar conectar
-});
+let pool;
+
+if (process.env.DATABASE_URL) {
+  // Configuración para Render (usa DATABASE_URL con SSL)
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+} else {
+  // Configuración local
+  pool = new Pool({
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    database: process.env.DB_NAME || 'punto_venta',
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000
+  });
+}
 
 // Log de conexión exitosa
 pool.on('connect', () => {
@@ -25,7 +35,7 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
-// Wrapper para queries (los controladores lo usan con db.query)
+// Wrapper para queries
 const db = {
   query: (text, params) => {
     if (process.env.DB_LOG_QUERIES === 'true') {
@@ -33,8 +43,6 @@ const db = {
     }
     return pool.query(text, params);
   },
-
-  // Transacciones manuales si quieres extender
   async getClient() {
     const client = await pool.connect();
     return client;
