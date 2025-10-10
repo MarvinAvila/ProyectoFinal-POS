@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const db = require('./src/config/database'); // Importar la configuración de BD
+const { inicializarBaseDeDatos, crearTriggers } = require('./src/config/initDatabase'); // ✅ NUEVO: Importar inicialización
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -119,6 +120,26 @@ app.get('/api/db-info', async (req, res) => {
     }
 });
 
+// ✅ NUEVO: Endpoint para inicializar/reinicializar BD
+app.post('/api/init-db', async (req, res) => {
+    try {
+        console.log('🔄 Solicitada inicialización de BD...');
+        await inicializarBaseDeDatos();
+        await crearTriggers();
+        
+        res.json({ 
+            success: true, 
+            message: 'Base de datos inicializada correctamente' 
+        });
+    } catch (error) {
+        console.error('❌ Error en init-db:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
 // Manejo de errores 404
 app.use('*', (req, res) => {
     res.status(404).json({ 
@@ -136,16 +157,30 @@ app.use((error, req, res, next) => {
     });
 });
 
-// Iniciar servidor con verificación de BD
+// ✅ MODIFICADO: Iniciar servidor con inicialización automática de BD
 app.listen(PORT, '0.0.0.0', async () => {
-
     console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
     console.log(`📊 Health check disponible en http://localhost:${PORT}/api/health`);
     console.log(`🔍 Info de BD disponible en http://localhost:${PORT}/api/db-info`);
+    console.log(`🔄 Endpoint de inicialización: http://localhost:${PORT}/api/init-db`);
     console.log('⏳ Verificando conexión a la base de datos...');
     
-    // Verificar conexión a BD después de iniciar el servidor
+    // Verificar conexión a BD
     await verificarConexionBD();
+    
+    // ✅ NUEVO: Inicializar automáticamente las tablas al iniciar
+    console.log('🔄 Inicializando tablas de la base de datos...');
+    try {
+        await inicializarBaseDeDatos();
+        console.log('✅ Tablas inicializadas correctamente');
+        
+        // Intentar crear triggers (opcional)
+        await crearTriggers();
+        
+    } catch (error) {
+        console.error('❌ Error inicializando tablas:', error.message);
+        console.log('💡 Puedes inicializar manualmente con: POST /api/init-db');
+    }
 });
 
 module.exports = app;
