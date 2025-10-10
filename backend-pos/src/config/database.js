@@ -1,4 +1,3 @@
-// src/config/database.js
 const { Pool } = require('pg');
 require('dotenv').config();
 
@@ -11,12 +10,12 @@ if (process.env.DATABASE_URL) {
     ssl: { rejectUnauthorized: false }
   });
 } else {
-  // Configuración local
+  // Configuración local para pruebas
   pool = new Pool({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
+    password: process.env.DB_PASSWORD || '111444', // contraseña de pruebas
     database: process.env.DB_NAME || 'punto_venta',
     max: 20,
     idleTimeoutMillis: 30000,

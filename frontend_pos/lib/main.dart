@@ -1,50 +1,46 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import 'shell/app_shell.dart';
-import 'auth/login_screen.dart';
-import 'productos/products_screen.dart';
-import 'carrito/cart_screen.dart';
-import 'reportes/reportes_screen.dart';
-import 'dashboard/dashboard_screen.dart';
-import 'categorias/categories_screen.dart';
-import 'alertas/alerts_screen.dart';
-import 'carrito/cart_controller.dart';
+// ✅ Pantallas de autenticación
+import 'package:frontend_pos/auth/home_login_screen.dart';
+import 'package:frontend_pos/auth/login_screen.dart';
+
+// ✅ Dashboards
+import 'package:frontend_pos/admin/dashboard/dashboard_screen.dart';
+import 'package:frontend_pos/gerente/gerente_dashboard.dart';
+import 'package:frontend_pos/dueno/dueno_dashboard.dart';
+import 'package:frontend_pos/empleado/empleado_dashboard_screen.dart';
+
+// ✅ Pantallas adicionales
+import 'package:frontend_pos/empleado/ventas/ventas_screen.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const PosApp());
+  runApp(const MyApp());
 }
 
-class PosApp extends StatelessWidget {
-  const PosApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => CartController()..init()),
-      ],
-      child: MaterialApp(
-        title: 'POS',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorSchemeSeed: Colors.deepPurple,
-          useMaterial3: true,
-        ),
-        // Puedes usar home: const AppShell(), o rutas:
-        initialRoute: '/',
-        routes: {
-          '/': (_) => const AppShell(),
-          '/login': (_) => const LoginScreen(),
-          '/dashboard': (_) => const DashboardScreen(),
-          '/productos': (_) => const ProductsScreen(),
-          '/carrito': (_) => const CartScreen(),
-          '/reportes': (_) => const ReportesScreen(),
-          '/categorias': (_) => const CategoriesScreen(),
-          '/alertas': (_) => const AlertsScreen(),
-        },
-      ),
+    return MaterialApp(
+      title: 'POS Roles App',
+      debugShowCheckedModeBanner: false,
+      // ✅ Pantalla inicial ahora es la selección de rol
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const HomeLoginScreen(),
+
+        // ✅ Si quieres entrar directo a login de admin (opcional):
+        '/login/admin': (context) => const LoginScreen(role: 'admin'),
+        '/login/gerente': (context) => const LoginScreen(role: 'gerente'),
+        '/cajero/empleado': (context) => const LoginScreen(role: 'empleado'),
+
+        // ✅ Dashboards
+        '/admin/dashboard': (context) => const AdminDashboardScreen(),
+        '/gerente/dashboard': (context) => const GerenteDashboard(),
+        '/dueno/dashboard': (context) => const DuenoDashboard(),
+        '/cajero/dashboard': (context) => const EmpleadoDashboardScreen(),
+      },
     );
   }
 }

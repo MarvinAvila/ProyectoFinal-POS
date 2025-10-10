@@ -7,89 +7,93 @@ const Alerta = require("../models/Alerta");
 const Reporte = require("../models/Reporte");
 
 const dashboardController = {
-  async getResumenCompleto(req, res) {
-    const client = await db.getClient();
-    try {
-      await client.query("BEGIN");
+ async getResumenCompleto(req, res) {
+  const client = await db.getClient();
+  try {
+    await client.query("BEGIN");
 
-      // 1. ESTADÍSTICAS BÁSICAS
-      const [
-        ventasHoyResult,
-        totalProductosResult,
-        totalUsuariosResult,
-        totalVentasMesResult,
-        alertasPendientesResult,
-      ] = await Promise.all([
-        client.query(`
-                            SELECT 
-                                COUNT(*) as total_ventas,
-                                COALESCE(SUM(total), 0) as ingresos_totales,
-                                COALESCE(AVG(total), 0) as promedio_venta,
-                                MAX(total) as venta_maxima
-                            FROM ventas 
-                            WHERE DATE(fecha) = CURRENT_DATE
-                        `),
-        client.query("SELECT COUNT(*) as total FROM productos"),
-        client.query(
-          "SELECT COUNT(*) as total FROM usuarios WHERE activo = true"
-        ),
-        client.query(`
-                            SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as ingresos
-                            FROM ventas 
-                            WHERE DATE_TRUNC('month', fecha) = DATE_TRUNC('month', CURRENT_DATE)
-                        `),
-        client.query(
-          "SELECT COUNT(*) as total FROM alertas WHERE atendida = FALSE"
-        ),
-      ]);
+    // 1. ESTADÍSTICAS BÁSICAS
+    const [
+      ventasHoyResult,
+      totalProductosResult,
+      totalUsuariosResult,
+      totalVentasMesResult,
+      alertasPendientesResult,
+    ] = await Promise.all([
+      client.query(`
+        SELECT 
+          COUNT(*) as total_ventas,
+          COALESCE(SUM(total), 0) as ingresos_totales,
+          COALESCE(AVG(total), 0) as promedio_venta,
+          MAX(total) as venta_maxima
+        FROM ventas 
+        WHERE DATE(fecha) = CURRENT_DATE
+      `),
+      client.query("SELECT COUNT(*) as total FROM productos"),
+      client.query("SELECT COUNT(*) as total FROM usuarios WHERE activo = true"),
+      client.query(`
+        SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as ingresos
+        FROM ventas 
+        WHERE DATE_TRUNC('month', fecha) = DATE_TRUNC('month', CURRENT_DATE)
+      `),
+      client.query("SELECT COUNT(*) as total FROM alertas WHERE atendida = FALSE"),
+    ]);
 
-      const estadisticasBasicas = {
-        ventas_hoy: {
-          total: parseInt(ventasHoyResult.rows[0].total_ventas),
-          ingresos: parseFloat(ventasHoyResult.rows[0].ingresos_totales),
-          promedio: parseFloat(ventasHoyResult.rows[0].promedio_venta),
-          maxima: parseFloat(ventasHoyResult.rows[0].venta_maxima),
-        },
-        total_productos: parseInt(totalProductosResult.rows[0].total),
-        total_usuarios: parseInt(totalUsuariosResult.rows[0].total),
-        ventas_mes: {
-          total: parseInt(totalVentasMesResult.rows[0].total),
-          ingresos: parseFloat(totalVentasMesResult.rows[0].ingresos),
-        },
-        alertas_pendientes: parseInt(alertasPendientesResult.rows[0].total),
-      };
+    const estadisticasBasicas = {
+      ventas_hoy: {
+        total: parseInt(ventasHoyResult.rows[0].total_ventas),
+        ingresos: parseFloat(ventasHoyResult.rows[0].ingresos_totales),
+        promedio: parseFloat(ventasHoyResult.rows[0].promedio_venta),
+        maxima: parseFloat(ventasHoyResult.rows[0].venta_maxima),
+      },
+      total_productos: parseInt(totalProductosResult.rows[0].total),
+      total_usuarios: parseInt(totalUsuariosResult.rows[0].total),
+      ventas_mes: {
+        total: parseInt(totalVentasMesResult.rows[0].total),
+        ingresos: parseFloat(totalVentasMesResult.rows[0].ingresos),
+      },
+      alertas_pendientes: parseInt(alertasPendientesResult.rows[0].total),
+    };
 
-      // 2. VENTAS RECIENTES (últimas 5 ventas)
-      const ventasRecientesResult = await client.query(`
-                        SELECT v.*, u.nombre as usuario_nombre
-                        FROM ventas v
-                        LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
-                        ORDER BY v.fecha DESC
-                        LIMIT 5
-                    `);
+    // 2. VENTAS RECIENTES
+    const ventasRecientesResult = await client.query(`
+      SELECT v.*, u.nombre as usuario_nombre
+      FROM ventas v
+      LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+      ORDER BY v.fecha DESC
+      LIMIT 5
+    `);
 
-      // ✅ USAR MODELO VENTA
-      const ventasRecientes = ventasRecientesResult.rows.map((row) => {
-        const venta = Venta.fromDatabaseRow(row);
-        return venta.toJSON();
-      });
+    // ✅ Evitar el error “toJSON is not a function”
+    const ventasRecientes = ventasRecientesResult.rows.map((row) => {
+      try {
+        const venta = Venta.fromDatabaseRow
+          ? Venta.fromDatabaseRow(row)
+          : row;
+        return venta.toJSON ? venta.toJSON() : venta;
+      } catch {
+        return row; // fallback seguro
+      }
+    });
 
-      // 3. PRODUCTOS MÁS VENDIDOS (top 5)
-      const productosPopularesResult = await client.query(`
-                        SELECT p.*, SUM(dv.cantidad) as total_vendido
-                        FROM productos p
-                        LEFT JOIN detalle_venta dv ON p.id_producto = dv.id_producto
-                        LEFT JOIN ventas v ON dv.id_venta = v.id_venta
-                        WHERE v.fecha >= CURRENT_DATE - INTERVAL '7 days'
-                        GROUP BY p.id_producto
-                        ORDER BY total_vendido DESC NULLS LAST
-                        LIMIT 5
-                    `);
+    // 3. PRODUCTOS POPULARES
+    const productosPopularesResult = await client.query(`
+      SELECT p.*, SUM(dv.cantidad) as total_vendido
+      FROM productos p
+      LEFT JOIN detalle_venta dv ON p.id_producto = dv.id_producto
+      LEFT JOIN ventas v ON dv.id_venta = v.id_venta
+      WHERE v.fecha >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY p.id_producto
+      ORDER BY total_vendido DESC NULLS LAST
+      LIMIT 5
+    `);
 
-      // ✅ USAR MODELO PRODUCTO
-      const productosPopulares = productosPopularesResult.rows.map((row) => {
-        const producto = Producto.fromDatabaseRow(row);
-        const productoEnriquecido = {
+    const productosPopulares = productosPopularesResult.rows.map((row) => {
+      try {
+        const producto = Producto.fromDatabaseRow
+          ? Producto.fromDatabaseRow(row)
+          : row;
+        return {
           ...(producto.toJSON ? producto.toJSON() : producto),
           total_vendido: parseInt(row.total_vendido) || 0,
           necesita_reposicion: producto.necesitaReposicion
@@ -99,126 +103,125 @@ const dashboardController = {
             ? producto.estaPorCaducar()
             : false,
         };
-        return productoEnriquecido;
-      });
+      } catch {
+        return row;
+      }
+    });
 
-      // 4. ALERTAS RECIENTES
-      const alertasRecientesResult = await client.query(`
-                        SELECT a.*, p.nombre as producto_nombre, p.stock
-                        FROM alertas a
-                        JOIN productos p ON a.id_producto = p.id_producto
-                        WHERE a.atendida = FALSE
-                        ORDER BY a.fecha DESC
-                        LIMIT 10
-                    `);
+    // 4. ALERTAS
+    const alertasRecientesResult = await client.query(`
+      SELECT a.*, p.nombre as producto_nombre, p.stock
+      FROM alertas a
+      JOIN productos p ON a.id_producto = p.id_producto
+      WHERE a.atendida = FALSE
+      ORDER BY a.fecha DESC
+      LIMIT 10
+    `);
 
-      // ✅ USAR MODELO ALERTA
-      const alertasRecientes = alertasRecientesResult.rows.map((row) => {
-        const alerta = Alerta.fromDatabaseRow(row);
+    const alertasRecientes = alertasRecientesResult.rows.map((row) => {
+      try {
+        const alerta = Alerta.fromDatabaseRow
+          ? Alerta.fromDatabaseRow(row)
+          : row;
         return alerta.toJSON ? alerta.toJSON() : alerta;
-      });
+      } catch {
+        return row;
+      }
+    });
 
-      // 5. ESTADÍSTICAS DE VENTAS POR DÍA (últimos 7 días)
-      const ventasUltimaSemanaResult = await client.query(`
-                        SELECT 
-                            DATE(fecha) as fecha,
-                            COUNT(*) as total_ventas,
-                            COALESCE(SUM(total), 0) as ingresos_diarios
-                        FROM ventas
-                        WHERE fecha >= CURRENT_DATE - INTERVAL '7 days'
-                        GROUP BY DATE(fecha)
-                        ORDER BY fecha ASC
-                    `);
+    // 5. VENTAS POR DÍA
+    const ventasUltimaSemanaResult = await client.query(`
+      SELECT 
+        DATE(fecha) as fecha,
+        COUNT(*) as total_ventas,
+        COALESCE(SUM(total), 0) as ingresos_diarios
+      FROM ventas
+      WHERE fecha >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY DATE(fecha)
+      ORDER BY fecha ASC
+    `);
 
-      const ventasPorDia = ventasUltimaSemanaResult.rows.map((row) => ({
-        fecha: row.fecha,
-        total_ventas: parseInt(row.total_ventas),
-        ingresos: parseFloat(row.ingresos_diarios),
-      }));
+    const ventasPorDia = ventasUltimaSemanaResult.rows.map((row) => ({
+      fecha: row.fecha,
+      total_ventas: parseInt(row.total_ventas),
+      ingresos: parseFloat(row.ingresos_diarios),
+    }));
 
-      // 6. PRODUCTOS CON STOCK BAJO
-      const stockBajoResult = await client.query(`
-                        SELECT p.*, c.nombre as categoria_nombre
-                        FROM productos p
-                        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-                        WHERE p.stock <= 5
-                        ORDER BY p.stock ASC
-                        LIMIT 10
-                    `);
+    // 6. STOCK BAJO (sin cambios)
+    const stockBajoResult = await client.query(`
+      SELECT p.*, c.nombre as categoria_nombre
+      FROM productos p
+      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+      WHERE p.stock <= 5
+      ORDER BY p.stock ASC
+      LIMIT 10
+    `);
 
-      const productosStockBajo = stockBajoResult.rows.map((row) => {
-        const producto = Producto.fromDatabaseRow(row);
-        return {
-          ...(producto.toJSON ? producto.toJSON() : producto),
-          categoria_nombre: row.categoria_nombre,
-          estado: producto.stock === 0 ? "AGOTADO" : "STOCK BAJO",
-        };
-      });
-
-      // 7. REPORTES RECIENTES
-      const reportesRecientesResult = await client.query(`
-                        SELECT r.*, u.nombre as usuario_nombre
-                        FROM reportes r
-                        LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
-                        ORDER BY r.fecha_generado DESC
-                        LIMIT 5
-                    `);
-
-      // ✅ USAR MODELO REPORTE
-      const reportesRecientes = reportesRecientesResult.rows.map((row) => {
-        const reporte = Reporte.fromDatabaseRow(row);
-        return reporte.toJSON ? reporte.toJSON(false) : reporte; // No incluir contenido pesado
-      });
-
-      await client.query("COMMIT");
-
-      // 8. CÁLCULOS ADICIONALES
-      const tendenciaVentas = this.calcularTendenciaVentas(ventasPorDia);
-      const metricasAdicionales =
-        this.calcularMetricasAdicionales(estadisticasBasicas);
-
-      const resumenCompleto = {
-        estadisticas: {
-          ...estadisticasBasicas,
-          ...metricasAdicionales,
-          tendencia_ventas: tendenciaVentas,
-        },
-        ventas_recientes: ventasRecientes,
-        productos_populares: productosPopulares,
-        alertas_recientes: alertasRecientes,
-        productos_stock_bajo: productosStockBajo,
-        reportes_recientes: reportesRecientes,
-        ventas_ultima_semana: ventasPorDia,
-        timestamp: new Date().toISOString(),
+    const productosStockBajo = stockBajoResult.rows.map((row) => {
+      const producto = Producto.fromDatabaseRow
+        ? Producto.fromDatabaseRow(row)
+        : row;
+      return {
+        ...(producto.toJSON ? producto.toJSON() : producto),
+        categoria_nombre: row.categoria_nombre,
+        estado: producto.stock === 0 ? "AGOTADO" : "STOCK BAJO",
       };
+    });
 
-      logger.api("Dashboard completo generado", {
-        usuario: req.user?.id_usuario,
-        estadisticas: {
-          ventas_hoy: estadisticasBasicas.ventas_hoy.total,
-          alertas_pendientes: estadisticasBasicas.alertas_pendientes,
-          productos_stock_bajo: productosStockBajo.length,
-        },
-      });
+    // 7. REPORTES RECIENTES
+    const reportesRecientesResult = await client.query(`
+      SELECT r.*, u.nombre as usuario_nombre
+      FROM reportes r
+      LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
+      ORDER BY r.fecha_generado DESC
+      LIMIT 5
+    `);
 
-      return responseHelper.success(
-        res,
-        resumenCompleto,
-        "Dashboard generado exitosamente"
-      );
-    } catch (error) {
-      await client.query("ROLLBACK");
+    const reportesRecientes = reportesRecientesResult.rows.map((row) => {
+      try {
+        const reporte = Reporte.fromDatabaseRow
+          ? Reporte.fromDatabaseRow(row)
+          : row;
+        return reporte.toJSON ? reporte.toJSON(false) : reporte;
+      } catch {
+        return row;
+      }
+    });
 
-      logger.error("Error en dashboardController.getResumenCompleto", {
-        error: error.message,
-        usuario: req.user?.id_usuario,
-      });
+    await client.query("COMMIT");
 
-      return responseHelper.error(res, "Error generando dashboard", 500, error);
-    } finally {
-      client.release();
-    }
-  },
+    const resumenCompleto = {
+      estadisticas: estadisticasBasicas,
+      ventas_recientes: ventasRecientes,
+      productos_populares: productosPopulares,
+      alertas_recientes: alertasRecientes,
+      productos_stock_bajo: productosStockBajo,
+      reportes_recientes: reportesRecientes,
+      ventas_ultima_semana: ventasPorDia,
+      timestamp: new Date().toISOString(),
+    };
+
+    logger.api("✅ Dashboard completo generado correctamente", {
+      usuario: req.user?.id_usuario,
+    });
+
+    return responseHelper.success(
+      res,
+      resumenCompleto,
+      "Dashboard generado exitosamente"
+    );
+  } catch (error) {
+    await client.query("ROLLBACK");
+    logger.error("Error en dashboardController.getResumenCompleto", {
+      error: error.message,
+      usuario: req.user?.id_usuario,
+    });
+    return responseHelper.error(res, "Error generando dashboard", 500, error);
+  } finally {
+    client.release();
+  }
+},
+
 
   async getMetricasRapidas(req, res) {
     const client = await db.getClient();
