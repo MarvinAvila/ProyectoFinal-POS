@@ -4,7 +4,7 @@ const responseHelper = require('../utils/responseHelper');
 const logger = require('../utils/logger');
 const QueryBuilder = require('../utils/queryBuilder');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_para_desarrollo_cambiar_en_produccion';
+const JWT_SECRET = process.env.JWT_SECRET || "tu_clave_secreta_jwt_muy_segura";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 const authMiddleware = {

@@ -7,7 +7,7 @@ const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 5432,
   user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
+  password: process.env.DB_PASSWORD || '111444', //cambie la contra pa pruebas del front
   database: process.env.DB_NAME || 'punto_venta',
   max: 20,            // máximo de conexiones en el pool
   idleTimeoutMillis: 30000, // tiempo de inactividad antes de cerrar conexión

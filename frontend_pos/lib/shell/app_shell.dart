@@ -2,10 +2,10 @@
 import 'package:flutter/material.dart';
 
 // Páginas principales
-import '../dashboard/dashboard_screen.dart';
-import '../productos/products_screen.dart';
-import '../carrito/cart_screen.dart';
-import '../reportes/reportes_screen.dart';
+import '../admin/dashboard/dashboard_screen.dart';
+import '../admin/productos/products_screen.dart';
+import '../empleado/carrito/cart_screen.dart';
+import '../admin/reportes/reportes_screen.dart';
 
 // Secundarias (se abren vía push)
 import '../categorias/categories_screen.dart';
@@ -27,7 +27,7 @@ class _AppShellState extends State<AppShell> {
 
   // Pantallas de cada pestaña (mantienen estado con IndexedStack)
   final _pages = const <Widget>[
-    DashboardScreen(),
+    AdminDashboardScreen(),
     ProductsScreen(),
     CartScreen(),
     ReportesScreen(),

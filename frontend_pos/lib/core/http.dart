@@ -79,8 +79,16 @@ class ApiClient {
   static Future<String?> get token async => _storage.read(key: _kTokenKey);
 
   // --------- Métodos HTTP genéricos ---------
-  Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
-    final res = await _dio.get(path, queryParameters: query);
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? query,
+    Map<String, dynamic>? headers, // ✅ ahora acepta headers
+  }) async {
+    final res = await _dio.get(
+      path,
+      queryParameters: query,
+      options: Options(headers: headers),
+    );
     return _parse(res);
   }
 
@@ -88,8 +96,14 @@ class ApiClient {
     String path, {
     Object? data,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? headers, // ✅ headers opcionales
   }) async {
-    final res = await _dio.post(path, data: data, queryParameters: query);
+    final res = await _dio.post(
+      path,
+      data: data,
+      queryParameters: query,
+      options: Options(headers: headers),
+    );
     return _parse(res);
   }
 
@@ -97,8 +111,14 @@ class ApiClient {
     String path, {
     Object? data,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? headers,
   }) async {
-    final res = await _dio.put(path, data: data, queryParameters: query);
+    final res = await _dio.put(
+      path,
+      data: data,
+      queryParameters: query,
+      options: Options(headers: headers),
+    );
     return _parse(res);
   }
 
@@ -106,8 +126,14 @@ class ApiClient {
     String path, {
     Object? data,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? headers,
   }) async {
-    final res = await _dio.delete(path, data: data, queryParameters: query);
+    final res = await _dio.delete(
+      path,
+      data: data,
+      queryParameters: query,
+      options: Options(headers: headers),
+    );
     return _parse(res);
   }
 

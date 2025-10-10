@@ -1,22 +1,23 @@
+//android/app/build.gradle.kts
+
+
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")        // <- este es el id correcto en KTS
-    // El plugin de Flutter debe ir después de Android y Kotlin.
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.example.frontend_pos"
 
-    // Estos valores los expone el plugin de Flutter.
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
-    // Recomendado con AGP 8.x: Java 17
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
     }
@@ -31,12 +32,11 @@ android {
 
     buildTypes {
         release {
-            // Firma de debug solo para poder ejecutar `flutter run --release`
             signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
 flutter {
-    source = "../.."
+    source = "../../"  // ✅ Usa String directamente
 }

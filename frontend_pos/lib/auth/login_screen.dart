@@ -1,147 +1,99 @@
-// lib/auth/login_screen.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'auth_controller.dart';
-import 'auth_repository.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
-  /// Si quieres que, al loguear, navegue a otra ruta:
-  final String? navigateToOnSuccess; // p.ej. '/'
+  final String role;
 
-  const LoginScreen({super.key, this.navigateToOnSuccess});
-
-  /// Helper para inyectar repo+controller localmente
-  static Widget withProvider({String? navigateToOnSuccess}) {
-    return FutureBuilder<AuthRepository>(
-      future: AuthRepository.create(),
-      builder: (context, snap) {
-        if (!snap.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        return ChangeNotifierProvider(
-          create:
-              (_) => AuthController(repo: snap.data!)..init(loadProfile: false),
-          child: LoginScreen(navigateToOnSuccess: navigateToOnSuccess),
-        );
-      },
-    );
-  }
+  const LoginScreen({super.key, required this.role});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _form = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
-  bool _obscure = true;
+  final TextEditingController correoController = TextEditingController();
+  final TextEditingController contrasenaController = TextEditingController();
+  final AuthService authService = AuthService();
 
-  @override
-  void dispose() {
-    _emailCtrl.dispose();
-    _passCtrl.dispose();
-    super.dispose();
-  }
+  bool cargando = false;
+  String? error;
 
-  Future<void> _doLogin() async {
-    if (!_form.currentState!.validate()) return;
-    final ctrl = context.read<AuthController>();
-    final ok = await ctrl.login(_emailCtrl.text.trim(), _passCtrl.text);
-    if (ok) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Sesión iniciada')));
-      if (widget.navigateToOnSuccess != null) {
-        Navigator.of(context).pushReplacementNamed(widget.navigateToOnSuccess!);
+  void iniciarSesion() async {
+    setState(() {
+      cargando = true;
+      error = null;
+    });
+
+    try {
+      final resultado = await authService.login(
+        correoController.text.trim(),
+        contrasenaController.text.trim(),
+      );
+
+      if (resultado['success'] == true) {
+        final data = resultado['data'];
+        final usuario = data['usuario'];
+        final token = data['token'];
+
+        if (usuario['rol'] == widget.role) {
+          final storage = const FlutterSecureStorage();
+          await storage.write(key: 'token', value: token);
+          await storage.write(key: 'rol', value: usuario['rol']);
+
+          print('✅ Login exitoso de ${usuario['nombre']} (${usuario['rol']})');
+          Navigator.pushReplacementNamed(context, '/${widget.role}/dashboard');
+        } else {
+          setState(() {
+            error =
+                'Rol incorrecto: este usuario no pertenece a ${widget.role.toUpperCase()}';
+          });
+        }
       } else {
-        Navigator.of(context).maybePop();
+        setState(() {
+          error = resultado['message'] ?? 'Credenciales inválidas';
+        });
       }
-    } else {
-      if (!mounted) return;
-      final msg = ctrl.error ?? 'No se pudo iniciar sesión';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      setState(() {
+        error = 'Error al conectar con el servidor: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        cargando = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final loading = context.watch<AuthController>().loading;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Iniciar sesión')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Form(
-              key: _form,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Correo',
-                      hintText: 'tucorreo@dominio.com',
-                      prefixIcon: Icon(Icons.mail_outline),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Ingresa tu correo';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _passCtrl,
-                    obscureText: _obscure,
-                    decoration: InputDecoration(
-                      labelText: 'Contraseña',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                        icon: Icon(
-                          _obscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                      ),
-                    ),
-                    onFieldSubmitted: (_) => _doLogin(),
-                    validator:
-                        (v) =>
-                            (v == null || v.isEmpty)
-                                ? 'Ingresa tu contraseña'
-                                : null,
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: loading ? null : _doLogin,
-                      child:
-                          loading
-                              ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : const Text('Entrar'),
-                    ),
-                  ),
-                ],
-              ),
+      appBar: AppBar(title: Text('Login - ${widget.role.toUpperCase()}')),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: correoController,
+              decoration: const InputDecoration(labelText: 'Correo'),
             ),
-          ),
+            TextField(
+              controller: contrasenaController,
+              decoration: const InputDecoration(labelText: 'Contraseña'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 20),
+            if (error != null)
+              Text(error!, style: const TextStyle(color: Colors.red)),
+            ElevatedButton(
+              onPressed: cargando ? null : iniciarSesion,
+              child:
+                  cargando
+                      ? const CircularProgressIndicator()
+                      : const Text('Iniciar sesión'),
+            ),
+          ],
         ),
       ),
     );

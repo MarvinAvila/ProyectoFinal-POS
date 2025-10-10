@@ -137,7 +137,8 @@ app.use((error, req, res, next) => {
 });
 
 // Iniciar servidor con verificación de BD
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
+
     console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
     console.log(`📊 Health check disponible en http://localhost:${PORT}/api/health`);
     console.log(`🔍 Info de BD disponible en http://localhost:${PORT}/api/db-info`);

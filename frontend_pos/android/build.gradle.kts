@@ -1,6 +1,8 @@
 // android/build.gradle.kts (nivel proyecto)
 
 
+// android/build.gradle.kts
+
 import org.gradle.api.tasks.Delete
 
 allprojects {
@@ -10,13 +12,6 @@ allprojects {
     }
 }
 
-val rootBuildDir = layout.buildDirectory.dir("../../build")
-layout.buildDirectory.set(rootBuildDir)
-
-subprojects {
-    layout.buildDirectory.set(rootBuildDir.map { it.dir(project.name) })
-}
-
 tasks.register<Delete>("clean") {
-    delete(layout.buildDirectory.get().asFile)
+    delete(rootProject.buildDir)
 }

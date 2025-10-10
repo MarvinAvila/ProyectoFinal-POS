@@ -15,7 +15,7 @@ void main() {
     WidgetTester tester,
   ) async {
     // Monta la app real
-    await tester.pumpWidget(const PosApp());
+    await tester.pumpWidget(const MyApp());
 
     // La app debería contener un MaterialApp
     expect(find.byType(MaterialApp), findsOneWidget);
