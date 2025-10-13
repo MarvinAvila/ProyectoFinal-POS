@@ -1,4 +1,3 @@
-// lib/productos/products_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -6,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'product_repository.dart';
 import 'product_model.dart';
 import '../../empleado/carrito/cart_controller.dart';
-import 'package:frontend_pos/core/widgets.dart'; // AppLoader, EmptyView, ErrorView
+import 'package:frontend_pos/core/widgets.dart'; // AppLoader, EmptyView
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -66,7 +65,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -89,7 +88,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            // 🔁 Reemplazo de SearchInput por TextField equivalente
             child: TextField(
               controller: _search,
               textInputAction: TextInputAction.search,
@@ -97,20 +95,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 hintText: 'Buscar por nombre o código...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon:
-                    (_search.text.isEmpty)
+                    _search.text.isEmpty
                         ? null
                         : IconButton(
                           tooltip: 'Limpiar',
                           onPressed: () {
                             _search.clear();
                             _onSearch(null);
-                            setState(() {}); // refrescar suffixIcon
+                            setState(() {});
                           },
                           icon: const Icon(Icons.clear),
                         ),
                 border: const OutlineInputBorder(),
               ),
-              onChanged: (_) => setState(() {}), // para refrescar el suffixIcon
+              onChanged: (_) => setState(() {}),
               onSubmitted: _onSearch,
             ),
           ),
@@ -135,46 +133,76 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             );
                           }
                           final p = _items[index];
+
+                          // ⚙️ Lógica local equivalente al backend
+                          final bool bajoStock = p.stock <= 5;
+                          final bool caducaPronto =
+                              p.fechaCaducidad != null &&
+                              p.fechaCaducidad!
+                                      .difference(DateTime.now())
+                                      .inDays <=
+                                  7 &&
+                              p.fechaCaducidad!.isAfter(DateTime.now());
+
                           return Card(
-                            child: ListTile(
-                              leading: _ProductAvatar(product: p),
-                              title: Text(
-                                p.nombre,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                'Código: ${p.codigoBarra} · ${p.unidad}\n'
-                                'Stock: ${p.stock.toStringAsFixed(2)}',
-                                maxLines: 2,
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    currency.format(p.precioVenta),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (p.bajoStock)
-                                        const _Tag(text: 'Bajo stock'),
-                                      if (p.caducaPronto) ...[
-                                        const SizedBox(width: 6),
-                                        const _Tag(text: 'Caduca pronto'),
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: ListTile(
+                                leading: _ProductAvatar(product: p),
+                                title: Text(
+                                  p.nombre,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style:
+                                      Theme.of(context).textTheme.titleMedium,
+                                ),
+                                subtitle: Text(
+                                  'Código: ${p.codigoBarra} · ${p.unidad}\n'
+                                  'Stock: ${p.stock.toStringAsFixed(2)}',
+                                  maxLines: 2,
+                                ),
+                                trailing: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      currency.format(p.precioVenta),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 17,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 2,
+                                      alignment: WrapAlignment.end,
+                                      children: [
+                                        if (bajoStock)
+                                          const _Tag(
+                                            text: 'Bajo stock',
+                                            color: Colors.orangeAccent,
+                                            icon: Icons.warning_amber_rounded,
+                                          ),
+                                        if (caducaPronto)
+                                          const _Tag(
+                                            text: 'Caduca pronto',
+                                            color: Colors.redAccent,
+                                            icon: Icons.timer_outlined,
+                                          ),
                                       ],
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                  ],
+                                ),
+                                onTap: () => _showDetails(p, currency),
+                                onLongPress: () => _addToCart(p),
                               ),
-                              onTap: () => _showDetails(p, currency),
-                              onLongPress: () => _addToCart(p),
                             ),
                           );
                         },
@@ -195,15 +223,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   void _addToCart(Product p) {
-    // Si no existe el Provider, no truena.
     try {
       final cart = context.read<CartController>();
-      cart.addProduct(id: p.id, nombre: p.nombre, precio: p.precioVenta);
+      cart.addProduct(
+        id: p.idProducto,
+        nombre: p.nombre,
+        precio: p.precioVenta,
+      );
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Agregado: ${p.nombre}')));
     } catch (_) {
-      // Provider no encontrado: ignoramos silenciosamente.
+      // Provider no encontrado
     }
   }
 
@@ -247,7 +278,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   value: DateFormat('yyyy-MM-dd').format(p.fechaCaducidad!),
                 ),
               const SizedBox(height: 8),
-              Align(
+              /* Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
                   onPressed: () {
@@ -257,8 +288,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   icon: const Icon(Icons.add_shopping_cart),
                   label: const Text('Agregar al carrito'),
                 ),
-              ),
-              const SizedBox(height: 8),
+              ),*/
             ],
           ),
         );
@@ -294,19 +324,37 @@ class _InfoRow extends StatelessWidget {
 
 class _Tag extends StatelessWidget {
   final String text;
-  const _Tag({required this.text});
+  final Color? color;
+  final IconData? icon;
+  const _Tag({required this.text, this.color, this.icon});
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.errorContainer;
-    final fg = Theme.of(context).colorScheme.onErrorContainer;
+    final bg = color ?? Theme.of(context).colorScheme.secondaryContainer;
+    final fg = Theme.of(context).colorScheme.onSecondaryContainer;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color,
+        color: bg.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: bg.withOpacity(0.5)),
       ),
-      child: Text(text, style: TextStyle(color: fg, fontSize: 11)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) Icon(icon, size: 13, color: bg.withOpacity(0.8)),
+          if (icon != null) const SizedBox(width: 3),
+          Text(
+            text,
+            style: TextStyle(
+              color: fg.withOpacity(0.9),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -320,7 +368,15 @@ class _ProductAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final initial =
         product.nombre.isNotEmpty ? product.nombre[0].toUpperCase() : '?';
-    return CircleAvatar(radius: size / 2, child: Text(initial));
-    // Si más adelante agregas imágenes, puedes reemplazar por Image.network/base64.
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: Theme.of(
+        context,
+      ).colorScheme.primaryContainer.withOpacity(0.7),
+      child: Text(
+        initial,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      ),
+    );
   }
 }

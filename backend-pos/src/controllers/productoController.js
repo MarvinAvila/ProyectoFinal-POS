@@ -32,7 +32,7 @@ const productoController = {
 
             // Filtros de búsqueda
             if (searchTerm) {
-                whereConditions.push(`(p.nombre ILIKE $${paramIndex} OR p.descripcion ILIKE $${paramIndex} OR p.codigo_barra ILIKE $${paramIndex})`);
+                whereConditions.push(`(p.nombre ILIKE $${paramIndex} OR p.codigo_barra ILIKE $${paramIndex})`);
                 params.push(`%${searchTerm}%`);
                 paramIndex++;
             }

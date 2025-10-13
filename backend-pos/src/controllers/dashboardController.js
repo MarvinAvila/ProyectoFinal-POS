@@ -19,6 +19,8 @@ const dashboardController = {
       totalUsuariosResult,
       totalVentasMesResult,
       alertasPendientesResult,
+      totalCategoriasResult,
+      totalProveedoresResult,
     ] = await Promise.all([
       client.query(`
         SELECT 
@@ -37,6 +39,8 @@ const dashboardController = {
         WHERE DATE_TRUNC('month', fecha) = DATE_TRUNC('month', CURRENT_DATE)
       `),
       client.query("SELECT COUNT(*) as total FROM alertas WHERE atendida = FALSE"),
+      client.query("SELECT COUNT(*) as total FROM categorias"),   // 🟪 NUEVO
+      client.query("SELECT COUNT(*) as total FROM proveedores"),  // 🟩 NUEVO
     ]);
 
     const estadisticasBasicas = {
@@ -53,6 +57,9 @@ const dashboardController = {
         ingresos: parseFloat(totalVentasMesResult.rows[0].ingresos),
       },
       alertas_pendientes: parseInt(alertasPendientesResult.rows[0].total),
+      total_categorias: parseInt(totalCategoriasResult.rows[0].total),
+      total_proveedores: parseInt(totalProveedoresResult.rows[0].total),
+
     };
 
     // 2. VENTAS RECIENTES
