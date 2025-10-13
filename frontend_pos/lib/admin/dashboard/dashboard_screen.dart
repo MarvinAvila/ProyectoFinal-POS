@@ -3,7 +3,6 @@ import 'package:frontend_pos/admin/productos/products_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'dashboard_repository.dart';
-import 'widgets/dashboard_chart.dart'; // ✅ Importamos la gráfica real
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -24,7 +23,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = MediaQuery.of(context).size.width < 700;
     final currency = NumberFormat.simpleCurrency(locale: 'es_MX');
 
     return Scaffold(
@@ -69,13 +68,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           }
 
           final data = snapshot.data!;
-          final chartData =
-              data.ventasUltimaSemana; // ✅ Datos reales del backend
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 🟣 PANEL DE BIENVENIDA
+                _buildWelcomePanel(context, isMobile),
+
+                const SizedBox(height: 24),
+
                 // 🟩 TARJETAS PRINCIPALES
                 GridView.count(
                   crossAxisCount: isMobile ? 1 : 2,
@@ -100,6 +103,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       color2: const Color(0xFF81D4FA),
                       onTap: () {},
                     ),
+
+                    // 🔸 CAMBIO: esta card ahora abre ProductsScreen como una vista completa
                     _buildCard(
                       title: 'Productos',
                       value: '${data.totalProductos}',
@@ -107,11 +112,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       color1: const Color(0xFFFFF59D),
                       color2: const Color(0xFFFFCCBC),
                       onTap: () {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true, // pantalla completa
-                          useSafeArea: true,
-                          builder: (_) => const ProductsScreen(),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ProductsScreen(),
+                          ),
                         );
                       },
                     ),
@@ -150,53 +155,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   ],
                 ),
-
-                /*  const SizedBox(height: 24),
-                // 📈 GRÁFICA DE VENTAS REALES
-                if (chartData.isNotEmpty)
-                  DashboardChart(
-                    title: 'Tendencia de Ventas (últimos días)',
-                    data: chartData,
-                    color: Colors.deepPurple,
-                  )
-                else
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'No hay datos de ventas recientes para mostrar en la gráfica.',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                    ),
-                  ),*/
-
-                /*const SizedBox(height: 24),
-                // ⚠️ SECCIÓN DE ALERTAS (por implementar)
-                Card(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 3,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Alertas Pendientes',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF5D3A9B),
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Aquí se mostrarán las alertas del sistema.',
-                          style: TextStyle(color: Colors.black54),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),*/
               ],
             ),
           );
@@ -205,7 +163,70 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // 🧱 Tarjeta reutilizable
+  // 🌟 PANEL DE BIENVENIDA
+  Widget _buildWelcomePanel(BuildContext context, bool isMobile) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE1BEE7), Color(0xFFD1C4E9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.shade100.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(3, 5),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // ÍCONO TRANSLÚCIDO DECORATIVO
+          Positioned(
+            right: isMobile ? -10 : 20,
+            bottom: isMobile ? -10 : 10,
+            child: Opacity(
+              opacity: 0.1,
+              child: Icon(
+                Icons.dashboard_rounded,
+                size: isMobile ? 100 : 160,
+                color: Colors.deepPurple.shade900,
+              ),
+            ),
+          ),
+
+          // Texto principal
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bienvenida, Administrador 👋',
+                style: TextStyle(
+                  fontSize: isMobile ? 20 : 26,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF4A148C),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Administra tus ventas, productos y reportes en un solo lugar.',
+                style: TextStyle(
+                  fontSize: isMobile ? 14 : 16,
+                  color: Colors.deepPurple.shade700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🧱 TARJETA REUTILIZABLE
   Widget _buildCard({
     required String title,
     required String value,
@@ -217,7 +238,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 250),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [color1, color2],
@@ -227,17 +248,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: color2.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(2, 4),
+              color: color2.withOpacity(0.4),
+              blurRadius: 10,
+              offset: const Offset(3, 6),
             ),
           ],
         ),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 40, color: const Color(0xFF5D3A9B)),
+            Icon(icon, size: 38, color: const Color(0xFF5D3A9B)),
             const SizedBox(height: 10),
             Text(
               title,
@@ -253,7 +274,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               style: const TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF5D3A9B),
+                color: Color(0xFF4A148C),
               ),
             ),
           ],
