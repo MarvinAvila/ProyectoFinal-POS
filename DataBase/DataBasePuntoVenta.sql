@@ -214,14 +214,6 @@ EXECUTE FUNCTION generar_alerta_stock();
 
 
 
--- 1) Usuarios
-INSERT INTO usuarios (nombre, correo, contrasena_hash, rol, activo)
-VALUES
-  ('Admin General', 'admin@pos.com',   '$2b$12$0qew2IjLMqBksQmCBmtgeOd4RekaLIsP4siyNeIwd4jAqbaKw/y7i', 'admin', TRUE),
-  ('empleado',        'caja1@pos.com',   '$2b$12$d3qHcJVkqfF/t/F5x07LseY6wRrnJSpYYQ9EhLjgmLrrOJK1Id1j2', 'empleado', TRUE),
-  ('Gerencia',      'gerente@pos.com', '$2b$12$H0R5gFCR9kjTHHC4twZcTe5hXDCw3sD3gW0SXJQw7o3/xmXOkZLuO', 'gerente', TRUE),
-  ('Dueño',         'dueno@pos.com',   '$2b$12$t6MkuRG0ocKx0.X7ebwZreIPT3Cif2i6XEoZTkhVFeiLVZUvSnO6W', 'dueno', TRUE);
-
 -- 2) Proveedores
 INSERT INTO proveedores (nombre, telefono, email, direccion)
 VALUES

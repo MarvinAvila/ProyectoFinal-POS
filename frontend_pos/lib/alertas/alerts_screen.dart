@@ -47,28 +47,32 @@ class _AlertsApi {
     return _AlertsApi._(dio);
   }
 
-  Future<List<AlertItem>> fetchAlerts() async {
-    final res = await _dio.get('/alertas');
+  /// 🔹 Obtiene alertas (todas o solo pendientes según parámetro)
+  Future<List<AlertItem>> fetchAlerts({bool onlyPending = false}) async {
+    final endpoint = onlyPending ? '/alertas/pendientes' : '/alertas';
+    final res = await _dio.get(endpoint);
     final data = res.data;
 
+    // ✅ Si el backend responde con { data: { alertas: [...] } }
+    if (data is Map && data['data'] is Map && data['data']['alertas'] is List) {
+      return (data['data']['alertas'] as List)
+          .map((e) => AlertItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+
+    // ✅ Si el backend responde con { data: [ ... ] }
     if (data is Map && data['data'] is List) {
       return (data['data'] as List)
           .map((e) => AlertItem.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     }
 
-    if (data is List) {
-      return data
-          .map((e) => AlertItem.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
-    }
-
-    throw Exception('Formato de respuesta no reconocido para /alertas');
+    throw Exception('Formato de respuesta no reconocido en /alertas');
   }
 
   /// Marca una alerta como atendida (PATCH /alertas/:id { atendida: true })
   Future<void> markAsAttended(int id) async {
-    await _dio.patch('/alertas/$id', data: {'atendida': true});
+    await _dio.patch('/alertas/$id/atendida');
   }
 
   /// Elimina una alerta (si tu backend lo permite)
@@ -108,7 +112,7 @@ class AlertsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _items = await _api.fetchAlerts();
+      _items = await _api.fetchAlerts(onlyPending: _onlyPending);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -117,9 +121,9 @@ class AlertsController extends ChangeNotifier {
     }
   }
 
-  void toggleFilter() {
+  void toggleFilter() async {
     _onlyPending = !_onlyPending;
-    notifyListeners();
+    await refresh(); // 🔹 recarga datos al cambiar filtro
   }
 
   Future<void> markAsAttended(AlertItem a) async {
@@ -169,6 +173,26 @@ class _AlertsView extends StatefulWidget {
 }
 
 class _AlertsViewState extends State<_AlertsView> {
+  Timer? _autoRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // 🔄 Refresco automático cada 20 s
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctrl = context.read<AlertsController>();
+      _autoRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+        if (!ctrl.loading) ctrl.refresh();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = context.watch<AlertsController>();
@@ -179,7 +203,7 @@ class _AlertsViewState extends State<_AlertsView> {
         actions: [
           IconButton(
             tooltip: ctrl.onlyPending ? 'Ver todas' : 'Ver pendientes',
-            onPressed: ctrl.toggleFilter,
+            onPressed: ctrl.loading ? null : ctrl.toggleFilter,
             icon: Icon(
               ctrl.onlyPending ? Icons.filter_alt : Icons.filter_alt_off,
             ),

@@ -39,3 +39,4 @@ class Categoria {
         return errors;
     }
 }
+    module.exports = Categoria;

@@ -1,32 +1,31 @@
-// lib/admin/proveedores/proveedores_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'proveedores_controller.dart';
-import 'proveedor_model.dart';
-import 'proveedor_form.dart';
+import 'categories_controller.dart';
+import 'category_model.dart';
+import 'category_form.dart';
 
-class ProveedoresScreen extends StatelessWidget {
-  const ProveedoresScreen({super.key});
+class CategoriesScreen extends StatelessWidget {
+  const CategoriesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => ProveedoresController()..fetchAll(),
-      child: const _ProveedoresView(),
+      create: (_) => CategoriesController()..fetchAll(),
+      child: const _CategoriesView(),
     );
   }
 }
 
-class _ProveedoresView extends StatelessWidget {
-  const _ProveedoresView();
+class _CategoriesView extends StatelessWidget {
+  const _CategoriesView();
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = context.watch<ProveedoresController>();
+    final ctrl = context.watch<CategoriesController>();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Proveedores'),
+        title: const Text('Categorías'),
         backgroundColor: const Color(0xFF5D3A9B),
         foregroundColor: Colors.white,
         actions: [
@@ -44,18 +43,18 @@ class _ProveedoresView extends StatelessWidget {
           }
 
           if (ctrl.error != null) {
-            return Center(child: Text(ctrl.error!));
+            return Center(child: Text('Error: ${ctrl.error}'));
           }
 
-          if (ctrl.proveedores.isEmpty) {
-            return const Center(child: Text('No hay proveedores registrados.'));
+          if (ctrl.categorias.isEmpty) {
+            return const Center(child: Text('No hay categorías registradas.'));
           }
 
           return ListView.builder(
             padding: const EdgeInsets.all(12),
-            itemCount: ctrl.proveedores.length,
+            itemCount: ctrl.categorias.length,
             itemBuilder: (context, i) {
-              final p = ctrl.proveedores[i];
+              final c = ctrl.categorias[i];
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 6),
                 shape: RoundedRectangleBorder(
@@ -64,70 +63,13 @@ class _ProveedoresView extends StatelessWidget {
                 elevation: 3,
                 child: ListTile(
                   title: Text(
-                    p.nombre,
+                    c.nombre,
                     style: const TextStyle(
                       color: Color(0xFF4A148C),
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
                     ),
                   ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 6.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (p.telefono != null && p.telefono!.isNotEmpty)
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.phone,
-                                size: 16,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                p.telefono!,
-                                style: const TextStyle(color: Colors.black87),
-                              ),
-                            ],
-                          ),
-                        if (p.email != null && p.email!.isNotEmpty)
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.email_outlined,
-                                size: 16,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                p.email!,
-                                style: const TextStyle(color: Colors.black87),
-                              ),
-                            ],
-                          ),
-                        if (p.direccion != null && p.direccion!.isNotEmpty)
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.location_on_outlined,
-                                size: 16,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  p.direccion!,
-                                  style: const TextStyle(color: Colors.black87),
-                                  overflow: TextOverflow.visible,
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
+                  subtitle: Text(c.descripcion ?? 'Sin descripción'),
                   trailing: PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert),
                     onSelected: (value) async {
@@ -137,8 +79,9 @@ class _ProveedoresView extends StatelessWidget {
                           MaterialPageRoute(
                             builder:
                                 (_) => ChangeNotifierProvider.value(
-                                  value: context.read<ProveedoresController>(),
-                                  child: ProveedorForm(proveedor: p),
+                                  // 🔹 Usa el mismo provider actual
+                                  value: context.read<CategoriesController>(),
+                                  child: CategoryForm(categoria: c),
                                 ),
                           ),
                         );
@@ -150,7 +93,7 @@ class _ProveedoresView extends StatelessWidget {
                               (_) => AlertDialog(
                                 title: const Text('Confirmar eliminación'),
                                 content: Text(
-                                  '¿Deseas eliminar al proveedor "${p.nombre}"?',
+                                  '¿Deseas eliminar la categoría "${c.nombre}"?',
                                 ),
                                 actions: [
                                   TextButton(
@@ -166,13 +109,14 @@ class _ProveedoresView extends StatelessWidget {
                                 ],
                               ),
                         );
+
                         if (confirm == true) {
-                          final ok = await ctrl.deleteProveedor(p.idProveedor!);
+                          final ok = await ctrl.deleteCategoria(c.idCategoria!);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
                                 ok
-                                    ? 'Proveedor eliminado'
+                                    ? 'Categoría eliminada'
                                     : 'Error al eliminar',
                               ),
                             ),
@@ -214,17 +158,18 @@ class _ProveedoresView extends StatelessWidget {
         backgroundColor: const Color(0xFF5D3A9B),
         child: const Icon(Icons.add),
         onPressed: () async {
-          final creado = await Navigator.push(
+          final creada = await Navigator.push(
             context,
             MaterialPageRoute(
               builder:
                   (_) => ChangeNotifierProvider.value(
-                    value: context.read<ProveedoresController>(),
-                    child: const ProveedorForm(),
+                    // 🔹 Reusa el mismo provider al abrir el formulario
+                    value: context.read<CategoriesController>(),
+                    child: const CategoryForm(),
                   ),
             ),
           );
-          if (creado == true) ctrl.fetchAll();
+          if (creada == true) context.read<CategoriesController>().fetchAll();
         },
       ),
     );
