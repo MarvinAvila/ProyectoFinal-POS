@@ -327,8 +327,14 @@ async create(req, res) {
       precio_venta: nuevoProducto.precio_venta,
       stock_inicial: nuevoProducto.stock
     });
+    // ✅ Respuesta compatible con Flutter
+    return res.status(201).json({
+      success: true,
+      message: "Producto creado exitosamente",
+      data: nuevoProducto
+    });
 
-    return responseHelper.success(res, nuevoProducto, "Producto creado exitosamente", 201);
+    //return responseHelper.success(res, nuevoProducto, "Producto creado exitosamente", 201);
 
   } catch (error) {
     await client.query('ROLLBACK');
@@ -446,8 +452,13 @@ async update(req, res) {
       producto_id: id,
       campos_actualizados: Object.keys(updates)
     });
-
-    return responseHelper.success(res, productoActualizado, "Producto actualizado exitosamente");
+      // ✅ Respuesta compatible con Flutter
+    return res.status(200).json({
+      success: true,
+      message: "Producto actualizado exitosamente",
+      data: productoActualizado
+    });
+    //return responseHelper.success(res, productoActualizado, "Producto actualizado exitosamente");
 
   } catch (error) {
     await client.query('ROLLBACK');

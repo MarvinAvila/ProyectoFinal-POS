@@ -199,6 +199,25 @@ EXECUTE FUNCTION generar_alerta_stock();
 
 
 
+ALTER TABLE productos
+  ADD COLUMN fecha_actualizacion TIMESTAMP;
+
+-- Si quieres que se ponga sola en cada UPDATE, puedes crear un trigger:
+CREATE OR REPLACE FUNCTION set_fecha_actualizacion()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.fecha_actualizacion := NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_set_fecha_actualizacion ON productos;
+
+CREATE TRIGGER trg_set_fecha_actualizacion
+BEFORE UPDATE ON productos
+FOR EACH ROW
+EXECUTE FUNCTION set_fecha_actualizacion();
+
 
 
 

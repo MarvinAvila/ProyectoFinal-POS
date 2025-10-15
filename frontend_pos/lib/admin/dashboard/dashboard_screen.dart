@@ -3,6 +3,7 @@ import 'package:frontend_pos/admin/categorias/category_screen.dart';
 import 'package:frontend_pos/admin/productos/products_screen.dart';
 import 'package:frontend_pos/admin/proveedores/proveedores_screen.dart';
 import 'package:frontend_pos/alertas/alerts_screen.dart';
+import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'dashboard_repository.dart';
@@ -105,15 +106,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         icon: Icons.attach_money,
                         color1: const Color(0xFFFFD6E8),
                         color2: const Color(0xFFD1C4E9),
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const VentasScreen(),
+                            ),
+                          ).then(
+                            (_) => _loadDashboard(),
+                          ); // ✅ se actualiza al volver
+                        },
                       ),
                       _buildCard(
-                        title: 'Ventas del Mes',
+                        title: 'Ventas',
                         value: currency.format(data.ventasMes),
                         icon: Icons.show_chart,
                         color1: const Color(0xFFB3E5FC),
                         color2: const Color(0xFF81D4FA),
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const VentasScreen(),
+                            ),
+                          ).then(
+                            (_) => _loadDashboard(),
+                          ); // ✅ se actualiza al volver
+                        },
                       ),
                       _buildCard(
                         title: 'Productos',

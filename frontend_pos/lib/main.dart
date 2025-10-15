@@ -6,7 +6,7 @@ import 'package:frontend_pos/auth/login_screen.dart';
 
 // ✅ Dashboards
 import 'package:frontend_pos/admin/dashboard/dashboard_screen.dart';
-import 'package:frontend_pos/gerente/gerente_dashboard.dart';
+import 'package:frontend_pos/gerente/dashboard/gerente_dashboard.dart';
 import 'package:frontend_pos/dueno/dueno_dashboard.dart';
 import 'package:frontend_pos/empleado/empleado_dashboard_screen.dart';
 import 'package:frontend_pos/admin/productos/products_screen.dart';

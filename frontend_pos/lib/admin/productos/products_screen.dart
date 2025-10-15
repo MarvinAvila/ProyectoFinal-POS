@@ -276,6 +276,7 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final repo = ProductRepository();
     final bool bajoStock = product.stock <= 5;
     final bool caducaPronto =
         product.fechaCaducidad != null &&
@@ -301,6 +302,7 @@ class _ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 🔹 Encabezado
             Row(
               children: [
                 _ProductAvatar(product: product),
@@ -325,14 +327,122 @@ class _ProductCard extends StatelessWidget {
                     fontSize: 15,
                   ),
                 ),
+
+                // 🟣 Menú contextual (Editar / Eliminar)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Color(0xFF4A148C)),
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      // ✏️ Editar producto
+                      final actualizado = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddProductScreen(product: product),
+                        ),
+                      );
+                      if (actualizado == true) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              '✅ Producto actualizado correctamente',
+                            ),
+                          ),
+                        );
+                        // Refresca lista
+                        final parent =
+                            context
+                                .findAncestorStateOfType<
+                                  _ProductsScreenState
+                                >();
+                        parent?._refresh();
+                      }
+                    } else if (value == 'delete') {
+                      // 🗑️ Confirmar eliminación
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder:
+                            (_) => AlertDialog(
+                              title: const Text('Eliminar producto'),
+                              content: Text(
+                                '¿Deseas eliminar "${product.nombre}" permanentemente?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed:
+                                      () => Navigator.pop(context, false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text(
+                                    'Eliminar',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ),
+                              ],
+                            ),
+                      );
+
+                      if (confirm == true) {
+                        try {
+                          await repo.delete(product.idProducto);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('🗑️ Producto eliminado'),
+                            ),
+                          );
+                          final parent =
+                              context
+                                  .findAncestorStateOfType<
+                                    _ProductsScreenState
+                                  >();
+                          parent?._refresh();
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('❌ Error al eliminar: $e')),
+                          );
+                        }
+                      }
+                    }
+                  },
+                  itemBuilder:
+                      (_) => const [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, color: Colors.deepPurple),
+                              SizedBox(width: 8),
+                              Text('Editar'),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Eliminar'),
+                            ],
+                          ),
+                        ),
+                      ],
+                ),
               ],
             ),
+
             const SizedBox(height: 8),
+
+            // 🔹 Info básica
             Text(
               'Código: ${product.codigoBarra} · ${product.unidad}\nStock: ${product.stock.toStringAsFixed(2)}',
               style: const TextStyle(color: Colors.black54, fontSize: 12.5),
             ),
+
             const Spacer(),
+
+            // 🔹 Etiquetas de estado
             Row(
               children: [
                 if (bajoStock)

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'package:dio/dio.dart';
+import 'product_model.dart';
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  final Product? product; // 👈 producto opcional para editar o crear
+
+  const AddProductScreen({super.key, this.product});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -21,6 +24,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   String? _unidadSeleccionada; // 🆕 Dropdown de unidad
   bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 🟣 Si viene un producto, precarga los datos (modo edición)
+    final p = widget.product;
+    if (p != null) {
+      _codigoCtrl.text = p.codigoBarra;
+      _nombreCtrl.text = p.nombre;
+      _precioCompraCtrl.text = p.precioCompra?.toString() ?? '';
+      _precioCtrl.text = p.precioVenta.toString();
+      _stockCtrl.text = p.stock.toString();
+      _unidadSeleccionada = p.unidad;
+      _categoriaCtrl.text = p.idCategoria?.toString() ?? '';
+    }
+  }
 
   // 📷 Escanear código de barras o escribirlo manual
   Future<void> _scanBarcode() async {
@@ -51,19 +71,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
         'precio_compra': double.tryParse(_precioCompraCtrl.text) ?? 0,
         'precio_venta': double.tryParse(_precioCtrl.text) ?? 0,
         'stock': double.tryParse(_stockCtrl.text) ?? 0,
-        'unidad': _unidadSeleccionada, // 🆕 del Dropdown
-        'id_categoria': 1, // ⚠️ Ajusta según el ID real de tu categoría
+        'unidad': _unidadSeleccionada,
+        'id_categoria': 1, // ⚠️ Ajusta según tu lógica real
         'id_proveedor': null,
         'fecha_caducidad': null,
         'imagen': null,
       };
 
-      final res = await ApiClient().post('/productos', data: body);
+      // Si es edición, podrías hacer PUT en lugar de POST
+      final bool isEdit = widget.product != null;
+      final res =
+          isEdit
+              ? await ApiClient().put(
+                '/productos/${widget.product!.idProducto}',
+                data: body,
+              )
+              : await ApiClient().post('/productos', data: body);
 
       if (!mounted) return;
 
       if (res is Map && res['success'] == true) {
-        _showSuccess('Producto agregado correctamente');
+        _showSuccess(
+          isEdit
+              ? 'Producto actualizado correctamente'
+              : 'Producto agregado correctamente',
+        );
         Navigator.pop(context, true);
       } else {
         _showError(res['message'] ?? 'Error desconocido al guardar');
@@ -118,11 +150,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 700;
+    final bool isEdit = widget.product != null;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F5FF),
       appBar: AppBar(
-        title: const Text('Agregar Producto'),
+        title: Text(isEdit ? 'Editar producto' : 'Agregar producto'),
         backgroundColor: const Color(0xFF6A1B9A),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -158,7 +191,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
               _buildField(_nombreCtrl, 'Nombre del producto'),
 
-              // 🆕 Campo de precio de compra
               _buildField(
                 _precioCompraCtrl,
                 'Precio de compra',
@@ -177,7 +209,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 keyboard: TextInputType.number,
               ),
 
-              // 🆕 Dropdown de unidad
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: DropdownButtonFormField<String>(
@@ -227,9 +258,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               strokeWidth: 2,
                             ),
                           )
-                          : const Text(
-                            'Guardar producto',
-                            style: TextStyle(
+                          : Text(
+                            isEdit ? 'Actualizar producto' : 'Guardar producto',
+                            style: const TextStyle(
                               fontSize: 16,
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
