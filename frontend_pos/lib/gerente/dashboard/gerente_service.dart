@@ -1,83 +1,80 @@
+// lib/gerente/services/gerente_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class GerenteService {
-  // Ajusta a tu host/puerto
-  static const String _baseUrl = 'http://192.168.1.67:3000/api';
+  // Igual que en AdminService para autenticación
+  static const String _authBase = 'http://192.168.1.67:3000/api/auth';
+  // Para el resumen del gerente
+  static const String _dashboardBase = 'http://192.168.1.67:3000/api/dashboard';
 
-  /// Login para rol GERENTE
-  /// Devuelve: { success: bool, token: String?, message: String?, user: Map? }
+  /// 🔑 LOGIN GERENTE (mismo patrón que AdminService.login)
   static Future<Map<String, dynamic>> login(
-    String correo,
-    String contrasena,
+    String email,
+    String password,
   ) async {
-    final uri = Uri.parse('$_baseUrl/auth/login');
+    final response = await http.post(
+      Uri.parse('$_authBase/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'correo': email, // campos que espera tu backend
+        'contrasena': password,
+      }),
+    );
 
-    try {
-      final res = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'correo': correo, 'contrasena': contrasena}),
-      );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
 
-      if (res.statusCode != 200) {
+      if (data['success'] == true && data['token'] != null) {
+        // Guardar token para posteriores peticiones (igual que admin)
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', data['token']);
+
+        return {'success': true, 'token': data['token']};
+      } else {
         return {
           'success': false,
-          'message': 'Error de autenticación (${res.statusCode})',
+          'message': data['message'] ?? 'Credenciales inválidas',
         };
       }
-
-      final body = jsonDecode(res.body);
-      final success = body['success'] == true;
-      final token = body['token'];
-      final user = body['user']; // si tu backend lo envía
-
-      if (!success) {
-        return {
-          'success': false,
-          'message': body['message'] ?? 'Credenciales inválidas',
-        };
-      }
-
-      // (Opcional pero recomendado) Verificar rol devuelto por el backend
-      final rol =
-          (user is Map && user['rol'] != null) ? user['rol'].toString() : null;
-      if (rol != null && rol.toLowerCase() != 'gerente') {
-        return {
-          'success': false,
-          'message': 'Este usuario no tiene rol de gerente',
-        };
-      }
-
-      return {
-        'success': true,
-        'token': token,
-        'message': body['message'] ?? 'Login exitoso',
-        'user': user,
-      };
-    } catch (e) {
+    } else {
       return {
         'success': false,
-        'message': 'No se pudo conectar al servidor: $e',
+        'message': 'Error en el servidor (${response.statusCode})',
       };
     }
   }
 
-  /// (Opcional) Ejemplo de petición autenticada para el dashboard del gerente
-  static Future<Map<String, dynamic>> fetchDashboard(String token) async {
-    final uri = Uri.parse('$_baseUrl/dashboard/gerente');
-    final res = await http.get(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+  /// 📊 RESUMEN GERENTE (equivalente a fetchSummary del admin)
+  /// Usa el token guardado y consulta /api/dashboard/gerente
+  static Future<Map<String, dynamic>> fetchSummary([String? token]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedToken = token ?? prefs.getString('token');
+
+    if (savedToken == null || savedToken.isEmpty) {
+      throw Exception('Token no encontrado');
+    }
+
+    final response = await http.get(
+      Uri.parse('$_dashboardBase/gerente'),
+      headers: {'Authorization': 'Bearer $savedToken'},
     );
 
-    if (res.statusCode != 200) {
-      throw Exception('Error obteniendo dashboard del gerente');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+
+      if (data['success'] == true) {
+        // El backend suele responder { success, data: {...} }
+        // devolvemos solo el payload útil como en AdminService
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      } else {
+        throw Exception(
+          data['message'] ?? 'Error al obtener resumen del gerente',
+        );
+      }
+    } else {
+      throw Exception('Error en el servidor (${response.statusCode})');
     }
-    final body = jsonDecode(res.body);
-    return body['data'] as Map<String, dynamic>;
   }
 }
