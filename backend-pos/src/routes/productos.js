@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const productoController = require("../controllers/productoController");
 const authMiddleware = require("../middleware/auth");
+const upload = require('../middleware/uploadMiddleware');
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware.verifyToken);
