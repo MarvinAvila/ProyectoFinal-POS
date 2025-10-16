@@ -3,21 +3,24 @@
 /// Modelo de producto mapeado a la tabla `productos` del SQL:
 /// id_producto, nombre, codigo_barra, precio_compra, precio_venta, stock,
 /// unidad, fecha_caducidad, id_proveedor, id_categoria, imagen
+// lib/productos/product_model.dart
+
+/// Modelo de producto compatible con el backend Node.js
 class Product {
-  final int id;
+  final int idProducto;
   final String nombre;
   final String codigoBarra;
   final double precioCompra;
   final double precioVenta;
   final double stock;
-  final String unidad; // pieza | kg | lt | otro
+  final String unidad;
   final DateTime? fechaCaducidad;
   final int? idProveedor;
   final int? idCategoria;
-  final String? imagen; // url o base64 (depende de tu backend)
+  final String? imagen;
 
   const Product({
-    required this.id,
+    required this.idProducto,
     required this.nombre,
     required this.codigoBarra,
     required this.precioCompra,
@@ -30,36 +33,35 @@ class Product {
     this.imagen,
   });
 
-  factory Product.fromJson(Map<String, dynamic> j) {
+  factory Product.fromJson(Map<String, dynamic> json) {
     double _num(dynamic v) =>
         v is num ? v.toDouble() : double.tryParse('${v ?? 0}') ?? 0.0;
     int _int(dynamic v) => v is int ? v : int.tryParse('${v ?? 0}') ?? 0;
 
     DateTime? _date(dynamic v) {
       if (v == null) return null;
-      final s = v.toString();
-      return DateTime.tryParse(s);
+      return DateTime.tryParse(v.toString());
     }
 
     return Product(
-      id: _int(j['id'] ?? j['id_producto']),
-      nombre: (j['nombre'] ?? j['name'] ?? '').toString(),
-      codigoBarra: (j['codigoBarra'] ?? j['codigo_barra'] ?? '').toString(),
-      precioCompra: _num(j['precioCompra'] ?? j['precio_compra']),
-      precioVenta: _num(j['precioVenta'] ?? j['precio_venta']),
-      stock: _num(j['stock']),
-      unidad: (j['unidad'] ?? 'pieza').toString(),
-      fechaCaducidad: _date(
-        j['fechaCaducidad'] ?? j['fecha_caducidad'] ?? j['caducidad'],
-      ),
-      idProveedor: j['id_proveedor'] == null ? null : _int(j['id_proveedor']),
-      idCategoria: j['id_categoria'] == null ? null : _int(j['id_categoria']),
-      imagen: j['imagen']?.toString(),
+      idProducto: _int(json['id_producto']),
+      nombre: json['nombre']?.toString() ?? '',
+      codigoBarra: json['codigo_barra']?.toString() ?? '',
+      precioCompra: _num(json['precio_compra']),
+      precioVenta: _num(json['precio_venta']),
+      stock: _num(json['stock']),
+      unidad: json['unidad']?.toString() ?? 'pieza',
+      fechaCaducidad: _date(json['fecha_caducidad']),
+      idProveedor:
+          json['id_proveedor'] == null ? null : _int(json['id_proveedor']),
+      idCategoria:
+          json['id_categoria'] == null ? null : _int(json['id_categoria']),
+      imagen: json['imagen']?.toString(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id_producto': id,
+    'id_producto': idProducto,
     'nombre': nombre,
     'codigo_barra': codigoBarra,
     'precio_compra': precioCompra,
@@ -71,9 +73,4 @@ class Product {
     'id_categoria': idCategoria,
     'imagen': imagen,
   };
-
-  bool get bajoStock => stock < 5;
-  bool get caducaPronto =>
-      fechaCaducidad != null &&
-      fechaCaducidad!.isBefore(DateTime.now().add(const Duration(days: 30)));
 }

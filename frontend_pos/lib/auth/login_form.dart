@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:frontend_pos/admin/services/admin_service.dart';
-import 'package:frontend_pos/gerente/services/gerente_service.dart';
+import 'package:frontend_pos/gerente/dashboard/gerente_service.dart';
 import 'package:frontend_pos/empleado/services/empleado_service.dart';
 
 class LoginForm extends StatefulWidget {

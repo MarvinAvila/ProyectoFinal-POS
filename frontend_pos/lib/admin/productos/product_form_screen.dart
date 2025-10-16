@@ -77,7 +77,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     setState(() => _guardando = true);
 
     final producto = Product(
-      id: widget.product?.id ?? 0,
+      idProducto: widget.product?.idProducto ?? 0,
       nombre: _nombreCtrl.text.trim(),
       codigoBarra: _codigoCtrl.text.trim(),
       precioCompra: double.tryParse(_precioCompraCtrl.text) ?? 0,

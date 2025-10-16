@@ -1,24 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:frontend_pos/admin/categorias/category_screen.dart';
-import 'package:frontend_pos/admin/productos/products_screen.dart';
-import 'package:frontend_pos/admin/proveedores/proveedores_screen.dart';
-import 'package:frontend_pos/alertas/alerts_screen.dart';
-import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
-import 'dashboard_repository.dart';
-import 'package:frontend_pos/admin/usuarios/users_screen.dart';
+import 'gerente_repository.dart';
 
-class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({super.key});
+class GerenteDashboard extends StatefulWidget {
+  const GerenteDashboard({super.key});
 
   @override
-  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+  State<GerenteDashboard> createState() => _GerenteDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  final repo = DashboardRepository();
-  late Future<DashboardData> dashboardFuture;
+class _GerenteDashboardScreenState extends State<GerenteDashboard> {
+  final repo = GerenteDashboardRepository();
+  late Future<GerenteDashboardData> dashboardFuture;
 
   @override
   void initState() {
@@ -26,11 +20,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _loadDashboard();
   }
 
-  // 🔄 Nueva función para recargar datos del dashboard
   Future<void> _loadDashboard() async {
-    setState(() {
-      dashboardFuture = repo.fetchDashboard();
-    });
+    setState(() => dashboardFuture = repo.fetchDashboard());
   }
 
   @override
@@ -41,7 +32,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F0FA),
       appBar: AppBar(
-        title: const Text('Panel de Administrador'),
+        title: const Text('Panel de Gerente'),
         backgroundColor: const Color(0xFF5D3A9B),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -58,19 +49,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   duration: Duration(seconds: 2),
                 ),
               );
-              Navigator.pushReplacementNamed(context, '/admin/login');
+              Navigator.pushReplacementNamed(context, '/gerente/login');
             },
           ),
         ],
       ),
 
-      // 🟪 Contenido principal
-      body: FutureBuilder<DashboardData>(
+      body: FutureBuilder<GerenteDashboardData>(
         future: dashboardFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
+          }
+          if (snapshot.hasError) {
             return Center(
               child: Text(
                 'Error: ${snapshot.error}',
@@ -82,7 +73,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           final data = snapshot.data!;
 
           return RefreshIndicator(
-            onRefresh: _loadDashboard, // permite hacer pull-to-refresh también
+            onRefresh: _loadDashboard,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -92,7 +83,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   _buildWelcomePanel(context, isMobile),
                   const SizedBox(height: 24),
 
-                  // 🟩 TARJETAS PRINCIPALES
+                  // 🟩 TARJETAS PRINCIPALES (patrón admin)
                   GridView.count(
                     crossAxisCount: isMobile ? 1 : 2,
                     mainAxisSpacing: 16,
@@ -107,110 +98,55 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         color1: const Color(0xFFFFD6E8),
                         color2: const Color(0xFFD1C4E9),
                         onTap: () {
-                          Navigator.push(
+                          Navigator.pushNamed(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const VentasScreen(),
-                            ),
-                          ).then(
-                            (_) => _loadDashboard(),
-                          ); // ✅ se actualiza al volver
+                            '/gerente/ventas',
+                            arguments: {'scope': 'hoy'},
+                          ).then((_) {
+                            _loadDashboard();
+                          });
                         },
                       ),
                       _buildCard(
-                        title: 'Ventas',
+                        title: 'Ventas del Mes',
                         value: currency.format(data.ventasMes),
                         icon: Icons.show_chart,
                         color1: const Color(0xFFB3E5FC),
                         color2: const Color(0xFF81D4FA),
                         onTap: () {
-                          Navigator.push(
+                          Navigator.pushNamed(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const VentasScreen(),
-                            ),
-                          ).then(
-                            (_) => _loadDashboard(),
-                          ); // ✅ se actualiza al volver
+                            '/gerente/ventas',
+                            arguments: {'scope': 'mes'},
+                          ).then((_) {
+                            _loadDashboard();
+                          });
                         },
                       ),
                       _buildCard(
-                        title: 'Productos',
-                        value: '${data.totalProductos}',
-                        icon: Icons.shopping_bag,
+                        title: 'Top Productos',
+                        value: '${data.topProductos.length}',
+                        icon: Icons.leaderboard,
                         color1: const Color(0xFFFFF59D),
-                        color2: const Color(0xFFFFCCBC),
+                        color2: const Color(0xFFFFCC80),
                         onTap: () {
-                          Navigator.push(
+                          Navigator.pushNamed(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const ProductsScreen(),
-                            ),
-                          ).then(
-                            (_) => _loadDashboard(),
-                          ); // ✅ se actualiza al volver
-                        },
-                      ),
-                      _buildCard(
-                        title: 'Categorías',
-                        value: '${data.totalCategorias}',
-                        icon: Icons.category,
-                        color1: const Color(0xFFD7CCC8),
-                        color2: const Color(0xFFBCAAA4),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const CategoriesScreen(),
-                            ),
-                          ).then((_) => _loadDashboard()); // ✅
-                        },
-                      ),
-                      _buildCard(
-                        title: 'Proveedores',
-                        value: '${data.totalProveedores}',
-                        icon: Icons.local_shipping,
-                        color1: const Color(0xFFC8E6C9),
-                        color2: const Color(0xFFA5D6A7),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ProveedoresScreen(),
-                            ),
-                          ).then(
-                            (_) => _loadDashboard(),
-                          ); // ✅ actualiza al volver
-                        },
-                      ),
-                      _buildCard(
-                        title: 'Usuarios',
-                        value: '${data.totalUsuarios}',
-                        icon: Icons.people_alt,
-                        color1: const Color(0xFFE1BEE7),
-                        color2: const Color(0xFFCE93D8),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const UsersScreen(),
-                            ),
-                          ).then((_) => _loadDashboard()); // ✅
+                            '/gerente/ventas/top-productos',
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                       _buildCard(
                         title: 'Alertas Pendientes',
                         value: '${data.alertasPendientes}',
                         icon: Icons.warning_amber_rounded,
-                        color1: const Color(0xFFFFF59D),
-                        color2: const Color(0xFFFFCC80),
+                        color1: const Color(0xFFC8E6C9),
+                        color2: const Color(0xFFA5D6A7),
                         onTap: () {
-                          Navigator.push(
+                          Navigator.pushNamed(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const AlertsScreen(),
-                            ),
-                          ).then((_) => _loadDashboard()); // ✅
+                            '/gerente/alertas',
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                     ],
@@ -224,7 +160,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // 🌟 PANEL DE BIENVENIDA
+  // 🌟 PANEL DE BIENVENIDA (igual estilo)
   Widget _buildWelcomePanel(BuildContext context, bool isMobile) {
     return Container(
       width: double.infinity,
@@ -262,7 +198,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Bienvenida, Administrador 👋',
+                'Bienvenido, Gerente 👋',
                 style: TextStyle(
                   fontSize: isMobile ? 20 : 26,
                   fontWeight: FontWeight.bold,
@@ -271,7 +207,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Administra tus ventas, productos y reportes en un solo lugar.',
+                'Supervisa ventas, alertas y desempeño en un solo lugar.',
                 style: TextStyle(
                   fontSize: isMobile ? 14 : 16,
                   color: Colors.deepPurple.shade700,
@@ -284,7 +220,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // 🧱 TARJETA REUTILIZABLE
+  // 🧱 TARJETA REUTILIZABLE (mismo widget que admin)
   Widget _buildCard({
     required String title,
     required String value,

@@ -46,3 +46,4 @@ class Proveedor {
         return errors;
     }
 }
+module.exports = Proveedor;

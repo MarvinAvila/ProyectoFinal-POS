@@ -42,6 +42,21 @@ class Producto {
     necesitaReposicion(stockMinimo = 5) {
         return this.stock <= stockMinimo;
     }
+       getEstadoStock() {
+        if (this.stock <= 0) return 'Sin stock';
+        if (this.stock <= 5) return 'Bajo';
+        return 'Disponible';
+    }
+    // Calcula los días restantes antes de la fecha de caducidad
+    diasParaCaducar() {
+    if (!this.fecha_caducidad) return null;
+    const hoy = new Date();
+    const caducidad = new Date(this.fecha_caducidad);
+    const diffTime = caducidad - hoy;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+    }
+
 
     calcularGanancia() {
         return this.precio_venta - this.precio_compra;

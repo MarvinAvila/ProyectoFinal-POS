@@ -89,7 +89,7 @@ class ProductRepository {
   /// (Opcional) Actualizar
   Future<Product> update(Product p) async {
     final data = await _api.put(
-      '${Endpoints.productos}/${p.id}',
+      '${Endpoints.productos}/${p.idProducto}',
       data: p.toJson(),
     );
     final m =

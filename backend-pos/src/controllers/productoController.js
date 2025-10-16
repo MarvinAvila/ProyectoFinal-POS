@@ -32,7 +32,7 @@ const productoController = {
 
             // Filtros de búsqueda
             if (searchTerm) {
-                whereConditions.push(`(p.nombre ILIKE $${paramIndex} OR p.descripcion ILIKE $${paramIndex} OR p.codigo_barra ILIKE $${paramIndex})`);
+                whereConditions.push(`(p.nombre ILIKE $${paramIndex} OR p.codigo_barra ILIKE $${paramIndex})`);
                 params.push(`%${searchTerm}%`);
                 paramIndex++;
             }
@@ -221,253 +221,259 @@ const productoController = {
         }
     },
 
-    async create(req, res) {
-        const client = await db.getClient();
-        try {
-            await client.query('BEGIN');
-            
-            const { 
-                id_categoria, 
-                id_proveedor, 
-                nombre, 
-                descripcion,
-                codigo_barra, 
-                precio_compra, 
-                precio_venta, 
-                stock, 
-                stock_minimo,
-                unidad, 
-                fecha_caducidad 
-            } = req.body;
+    // 🟣 Crear producto (sin stock_minimo)
+async create(req, res) {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    
+    const { 
+      id_categoria, 
+      id_proveedor, 
+      nombre, 
+      codigo_barra, 
+      precio_compra, 
+      precio_venta, 
+      stock, 
+      unidad, 
+      fecha_caducidad 
+    } = req.body;
 
-            // Sanitizar entrada
-            const productoData = {
-                nombre: helpers.sanitizeInput(nombre),
-                descripcion: descripcion ? helpers.sanitizeInput(descripcion) : null,
-                codigo_barra: codigo_barra || `BC${Date.now()}${Math.floor(Math.random() * 1000)}`,
-                precio_compra: parseFloat(precio_compra),
-                precio_venta: parseFloat(precio_venta),
-                stock: parseFloat(stock) || 0,
-                stock_minimo: parseFloat(stock_minimo) || 0,
-                unidad: unidad || 'unidad',
-                fecha_caducidad: fecha_caducidad || null,
-                id_categoria: id_categoria ? QueryBuilder.validateId(id_categoria) : null,
-                id_proveedor: id_proveedor ? QueryBuilder.validateId(id_proveedor) : null
-            };
+    // Sanitizar entrada
+    const productoData = {
+      nombre: helpers.sanitizeInput(nombre),
+      codigo_barra: codigo_barra || `BC${Date.now()}${Math.floor(Math.random() * 1000)}`,
+      precio_compra: parseFloat(precio_compra),
+      precio_venta: parseFloat(precio_venta),
+      stock: parseFloat(stock) || 0,
+      unidad: unidad || 'unidad',
+      fecha_caducidad: fecha_caducidad || null,
+      id_categoria: id_categoria ? QueryBuilder.validateId(id_categoria) : null,
+      id_proveedor: id_proveedor ? QueryBuilder.validateId(id_proveedor) : null
+    };
 
-            // Validar usando el modelo
-            const validationErrors = Producto.validate(productoData);
-            if (validationErrors.length > 0) {
-                await client.query('ROLLBACK');
-                return responseHelper.error(res, 'Errores de validación', 400, {
-                    errors: validationErrors
-                });
-            }
+    // Validar usando el modelo
+    const validationErrors = Producto.validate(productoData);
+    if (validationErrors.length > 0) {
+      await client.query('ROLLBACK');
+      return responseHelper.error(res, 'Errores de validación', 400, {
+        errors: validationErrors
+      });
+    }
 
-            // Verificar código de barras único
-            if (codigo_barra) {
-                const codigoExistente = await client.query(
-                    'SELECT id_producto FROM productos WHERE codigo_barra = $1',
-                    [productoData.codigo_barra]
-                );
-                if (codigoExistente.rows.length > 0) {
-                    await client.query('ROLLBACK');
-                    return responseHelper.conflict(res, 'Ya existe un producto con ese código de barras');
-                }
-            }
+    // Verificar código de barras único
+    if (codigo_barra) {
+      const codigoExistente = await client.query(
+        'SELECT id_producto FROM productos WHERE codigo_barra = $1',
+        [productoData.codigo_barra]
+      );
+      if (codigoExistente.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return responseHelper.conflict(res, 'Ya existe un producto con ese código de barras');
+      }
+    }
 
-            // Verificar categoría si se proporciona
-            if (id_categoria) {
-                const categoriaExists = await client.query(
-                    'SELECT id_categoria FROM categorias WHERE id_categoria = $1',
-                    [id_categoria]
-                );
-                if (categoriaExists.rows.length === 0) {
-                    await client.query('ROLLBACK');
-                    return responseHelper.notFound(res, 'Categoría');
-                }
-            }
+    // Verificar categoría si se proporciona
+    if (id_categoria) {
+      const categoriaExists = await client.query(
+        'SELECT id_categoria FROM categorias WHERE id_categoria = $1',
+        [id_categoria]
+      );
+      if (categoriaExists.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return responseHelper.notFound(res, 'Categoría');
+      }
+    }
 
-            // Verificar proveedor si se proporciona
-            if (id_proveedor) {
-                const proveedorExists = await client.query(
-                    'SELECT id_proveedor FROM proveedores WHERE id_proveedor = $1',
-                    [id_proveedor]
-                );
-                if (proveedorExists.rows.length === 0) {
-                    await client.query('ROLLBACK');
-                    return responseHelper.notFound(res, 'Proveedor');
-                }
-            }
+    // Verificar proveedor si se proporciona
+    if (id_proveedor) {
+      const proveedorExists = await client.query(
+        'SELECT id_proveedor FROM proveedores WHERE id_proveedor = $1',
+        [id_proveedor]
+      );
+      if (proveedorExists.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return responseHelper.notFound(res, 'Proveedor');
+      }
+    }
 
-            const result = await client.query(
-                `INSERT INTO productos (
-                    id_categoria, id_proveedor, nombre, descripcion, codigo_barra, 
-                    precio_compra, precio_venta, stock, stock_minimo, unidad, fecha_caducidad
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                RETURNING *`,
-                [
-                    productoData.id_categoria,
-                    productoData.id_proveedor,
-                    productoData.nombre,
-                    productoData.descripcion,
-                    productoData.codigo_barra,
-                    productoData.precio_compra,
-                    productoData.precio_venta,
-                    productoData.stock,
-                    productoData.stock_minimo,
-                    productoData.unidad,
-                    productoData.fecha_caducidad
-                ]
-            );
+    // ✅ INSERT sin stock_minimo
+    const result = await client.query(
+      `INSERT INTO productos (
+          id_categoria, id_proveedor, nombre, codigo_barra, 
+          precio_compra, precio_venta, stock, unidad, fecha_caducidad
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *`,
+      [
+        productoData.id_categoria,
+        productoData.id_proveedor,
+        productoData.nombre,
+        productoData.codigo_barra,
+        productoData.precio_compra,
+        productoData.precio_venta,
+        productoData.stock,
+        productoData.unidad,
+        productoData.fecha_caducidad
+      ]
+    );
 
-            await client.query('COMMIT');
+    await client.query('COMMIT');
 
-            const nuevoProducto = ModelMapper.toProducto(result.rows[0]);
+    const nuevoProducto = ModelMapper.toProducto(result.rows[0]);
 
-            logger.audit("Producto creado", req.user?.id_usuario, "CREATE", {
-                producto_id: nuevoProducto.id_producto,
-                nombre: nuevoProducto.nombre,
-                precio_venta: nuevoProducto.precio_venta,
-                stock_inicial: nuevoProducto.stock
-            });
+    logger.audit("Producto creado", req.user?.id_usuario, "CREATE", {
+      producto_id: nuevoProducto.id_producto,
+      nombre: nuevoProducto.nombre,
+      precio_venta: nuevoProducto.precio_venta,
+      stock_inicial: nuevoProducto.stock
+    });
+    // ✅ Respuesta compatible con Flutter
+    return res.status(201).json({
+      success: true,
+      message: "Producto creado exitosamente",
+      data: nuevoProducto
+    });
 
-            return responseHelper.success(res, nuevoProducto, "Producto creado exitosamente", 201);
+    //return responseHelper.success(res, nuevoProducto, "Producto creado exitosamente", 201);
 
-        } catch (error) {
-            await client.query('ROLLBACK');
-            
-            if (error.message === 'ID inválido') {
-                return responseHelper.error(res, 'ID de categoría o proveedor inválido', 400);
-            }
-            
-            logger.error("Error en productoController.create", error);
-            return responseHelper.error(res, "Error creando producto", 500, error);
-        } finally {
-            client.release();
-        }
-    },
+  } catch (error) {
+    await client.query('ROLLBACK');
+    
+    if (error.message === 'ID inválido') {
+      return responseHelper.error(res, 'ID de categoría o proveedor inválido', 400);
+    }
+    
+    logger.error("Error en productoController.create", error);
+    return responseHelper.error(res, "Error creando producto", 500, error);
+  } finally {
+    client.release();
+  }
+},
+// 🟣 Actualizar producto (sin stock_minimo)
+async update(req, res) {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
 
-    async update(req, res) {
-        const client = await db.getClient();
-        try {
-            await client.query('BEGIN');
+    const id = QueryBuilder.validateId(req.params.id);
+    const updates = req.body;
 
-            const id = QueryBuilder.validateId(req.params.id);
-            const updates = req.body;
+    // Verificar que el producto existe
+    const productoExistente = await client.query(
+      'SELECT * FROM productos WHERE id_producto = $1',
+      [id]
+    );
 
-            // Verificar que el producto existe
-            const productoExistente = await client.query(
-                'SELECT * FROM productos WHERE id_producto = $1',
-                [id]
-            );
+    if (productoExistente.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return responseHelper.notFound(res, 'Producto');
+    }
 
-            if (productoExistente.rows.length === 0) {
-                await client.query('ROLLBACK');
-                return responseHelper.notFound(res, 'Producto');
-            }
+    // Preparar datos actuales
+    const productoActual = productoExistente.rows[0];
+    const productoData = { ...productoActual };
 
-            // Preparar datos para actualización
-            const productoActual = productoExistente.rows[0];
-            const productoData = { ...productoActual };
+    // Aplicar updates validados (sin stock_minimo)
+    if (updates.nombre !== undefined) productoData.nombre = helpers.sanitizeInput(updates.nombre);
+    if (updates.codigo_barra !== undefined) productoData.codigo_barra = updates.codigo_barra;
+    if (updates.precio_compra !== undefined) productoData.precio_compra = parseFloat(updates.precio_compra);
+    if (updates.precio_venta !== undefined) productoData.precio_venta = parseFloat(updates.precio_venta);
+    if (updates.stock !== undefined) productoData.stock = parseFloat(updates.stock);
+    if (updates.unidad !== undefined) productoData.unidad = updates.unidad;
+    if (updates.fecha_caducidad !== undefined) productoData.fecha_caducidad = updates.fecha_caducidad;
+    if (updates.id_categoria !== undefined)
+      productoData.id_categoria = updates.id_categoria ? QueryBuilder.validateId(updates.id_categoria) : null;
+    if (updates.id_proveedor !== undefined)
+      productoData.id_proveedor = updates.id_proveedor ? QueryBuilder.validateId(updates.id_proveedor) : null;
 
-            // Aplicar updates validados
-            if (updates.nombre !== undefined) productoData.nombre = helpers.sanitizeInput(updates.nombre);
-            if (updates.descripcion !== undefined) productoData.descripcion = helpers.sanitizeInput(updates.descripcion);
-            if (updates.codigo_barra !== undefined) productoData.codigo_barra = updates.codigo_barra;
-            if (updates.precio_compra !== undefined) productoData.precio_compra = parseFloat(updates.precio_compra);
-            if (updates.precio_venta !== undefined) productoData.precio_venta = parseFloat(updates.precio_venta);
-            if (updates.stock !== undefined) productoData.stock = parseFloat(updates.stock);
-            if (updates.stock_minimo !== undefined) productoData.stock_minimo = parseFloat(updates.stock_minimo);
-            if (updates.unidad !== undefined) productoData.unidad = updates.unidad;
-            if (updates.fecha_caducidad !== undefined) productoData.fecha_caducidad = updates.fecha_caducidad;
-            if (updates.id_categoria !== undefined) productoData.id_categoria = updates.id_categoria ? QueryBuilder.validateId(updates.id_categoria) : null;
-            if (updates.id_proveedor !== undefined) productoData.id_proveedor = updates.id_proveedor ? QueryBuilder.validateId(updates.id_proveedor) : null;
+    // Validar con el modelo
+    const validationErrors = Producto.validate(productoData);
+    if (validationErrors.length > 0) {
+      await client.query('ROLLBACK');
+      return responseHelper.error(res, 'Errores de validación', 400, { errors: validationErrors });
+    }
 
-            // Validar usando el modelo
-            const validationErrors = Producto.validate(productoData);
-            if (validationErrors.length > 0) {
-                await client.query('ROLLBACK');
-                return responseHelper.error(res, 'Errores de validación', 400, {
-                    errors: validationErrors
-                });
-            }
+    // Verificar código de barras único si se cambia
+    if (updates.codigo_barra && updates.codigo_barra !== productoActual.codigo_barra) {
+      const codigoExistente = await client.query(
+        'SELECT id_producto FROM productos WHERE codigo_barra = $1 AND id_producto != $2',
+        [updates.codigo_barra, id]
+      );
+      if (codigoExistente.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return responseHelper.conflict(res, 'Ya existe otro producto con ese código de barras');
+      }
+    }
 
-            // Verificar código de barras único si se está actualizando
-            if (updates.codigo_barra && updates.codigo_barra !== productoActual.codigo_barra) {
-                const codigoExistente = await client.query(
-                    'SELECT id_producto FROM productos WHERE codigo_barra = $1 AND id_producto != $2',
-                    [updates.codigo_barra, id]
-                );
-                if (codigoExistente.rows.length > 0) {
-                    await client.query('ROLLBACK');
-                    return responseHelper.conflict(res, 'Ya existe otro producto con ese código de barras');
-                }
-            }
+    // Construir query dinámica
+    const setClauses = [];
+    const values = [];
+    let paramIndex = 1;
 
-            // Construir query de actualización dinámica
-            const setClauses = [];
-            const values = [];
-            let paramIndex = 1;
+    Object.keys(updates).forEach(field => {
+      if (['nombre', 'codigo_barra', 'unidad', 'fecha_caducidad'].includes(field)) {
+        setClauses.push(`${field} = $${paramIndex}`);
+        values.push(productoData[field]);
+        paramIndex++;
+      } else if (['precio_compra', 'precio_venta', 'stock'].includes(field)) {
+        setClauses.push(`${field} = $${paramIndex}`);
+        values.push(parseFloat(updates[field]));
+        paramIndex++;
+      } else if (field === 'id_categoria') {
+        setClauses.push(`id_categoria = $${paramIndex}`);
+        values.push(updates[field] ? QueryBuilder.validateId(updates[field]) : null);
+        paramIndex++;
+      } else if (field === 'id_proveedor') {
+        setClauses.push(`id_proveedor = $${paramIndex}`);
+        values.push(updates[field] ? QueryBuilder.validateId(updates[field]) : null);
+        paramIndex++;
+      }
+    });
 
-            Object.keys(updates).forEach(field => {
-                if (['nombre', 'descripcion', 'codigo_barra', 'unidad', 'fecha_caducidad'].includes(field)) {
-                    setClauses.push(`${field} = $${paramIndex}`);
-                    values.push(productoData[field]);
-                    paramIndex++;
-                } else if (['precio_compra', 'precio_venta', 'stock', 'stock_minimo'].includes(field)) {
-                    setClauses.push(`${field} = $${paramIndex}`);
-                    values.push(parseFloat(updates[field]));
-                    paramIndex++;
-                } else if (field === 'id_categoria') {
-                    setClauses.push(`id_categoria = $${paramIndex}`);
-                    values.push(updates[field] ? QueryBuilder.validateId(updates[field]) : null);
-                    paramIndex++;
-                } else if (field === 'id_proveedor') {
-                    setClauses.push(`id_proveedor = $${paramIndex}`);
-                    values.push(updates[field] ? QueryBuilder.validateId(updates[field]) : null);
-                    paramIndex++;
-                }
-            });
+    if (setClauses.length === 0) {
+      await client.query('ROLLBACK');
+      return responseHelper.error(res, 'No se proporcionaron campos válidos para actualizar', 400);
+    }
 
-            if (setClauses.length === 0) {
-                await client.query('ROLLBACK');
-                return responseHelper.error(res, 'No se proporcionaron campos válidos para actualizar', 400);
-            }
+    values.push(id);
+    const setSQL = setClauses.join(', ');
 
-            values.push(id);
-            const setSQL = setClauses.join(', ');
+    const result = await client.query(
+      `UPDATE productos SET ${setSQL}, fecha_actualizacion = CURRENT_TIMESTAMP 
+       WHERE id_producto = $${paramIndex} RETURNING *`,
+      values
+    );
 
-            const result = await client.query(
-                `UPDATE productos SET ${setSQL}, fecha_actualizacion = CURRENT_TIMESTAMP 
-                 WHERE id_producto = $${paramIndex} RETURNING *`,
-                values
-            );
+    await client.query('COMMIT');
 
-            await client.query('COMMIT');
+    const productoActualizado = ModelMapper.toProducto(result.rows[0]);
 
-            const productoActualizado = ModelMapper.toProducto(result.rows[0]);
+    logger.audit("Producto actualizado", req.user?.id_usuario, "UPDATE", {
+      producto_id: id,
+      campos_actualizados: Object.keys(updates)
+    });
+      // ✅ Respuesta compatible con Flutter
+    return res.status(200).json({
+      success: true,
+      message: "Producto actualizado exitosamente",
+      data: productoActualizado
+    });
+    //return responseHelper.success(res, productoActualizado, "Producto actualizado exitosamente");
 
-            logger.audit("Producto actualizado", req.user?.id_usuario, "UPDATE", {
-                producto_id: id,
-                campos_actualizados: Object.keys(updates)
-            });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    
+    if (error.message === 'ID inválido') {
+      return responseHelper.error(res, 'ID de categoría o proveedor inválido', 400);
+    }
+    
+    logger.error("Error en productoController.update", error);
+    return responseHelper.error(res, "Error actualizando producto", 500, error);
+  } finally {
+    client.release();
+  }
+},
 
-            return responseHelper.success(res, productoActualizado, "Producto actualizado exitosamente");
-
-        } catch (error) {
-            await client.query('ROLLBACK');
-            
-            if (error.message === 'ID inválido') {
-                return responseHelper.error(res, 'ID de categoría o proveedor inválido', 400);
-            }
-            
-            logger.error("Error en productoController.update", error);
-            return responseHelper.error(res, "Error actualizando producto", 500, error);
-        } finally {
-            client.release();
-        }
-    },
 
     async delete(req, res) {
         const client = await db.getClient();
