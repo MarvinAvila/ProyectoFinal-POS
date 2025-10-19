@@ -1,1 +1,0 @@
-//Dropdown de categorías
