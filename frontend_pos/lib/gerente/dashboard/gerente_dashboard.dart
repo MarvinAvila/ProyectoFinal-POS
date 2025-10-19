@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'gerente_repository.dart';
+import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
+import 'package:frontend_pos/alertas/alerts_screen.dart';
+import 'package:frontend_pos/gerente/ventas/top_productos_screen.dart';
 
 class GerenteDashboard extends StatefulWidget {
   const GerenteDashboard({super.key});
@@ -108,21 +111,23 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
                         },
                       ),
                       _buildCard(
-                        title: 'Ventas del Mes',
+                        title: 'Ventas',
                         value: currency.format(data.ventasMes),
                         icon: Icons.show_chart,
                         color1: const Color(0xFFB3E5FC),
                         color2: const Color(0xFF81D4FA),
                         onTap: () {
-                          Navigator.pushNamed(
+                          Navigator.push(
                             context,
-                            '/gerente/ventas',
-                            arguments: {'scope': 'mes'},
-                          ).then((_) {
-                            _loadDashboard();
-                          });
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                      const VentasScreen(), // 👈 Reutiliza la del admin
+                            ),
+                          ).then((_) => _loadDashboard());
                         },
                       ),
+
                       _buildCard(
                         title: 'Top Productos',
                         value: '${data.topProductos.length}',
@@ -130,23 +135,27 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
                         color1: const Color(0xFFFFF59D),
                         color2: const Color(0xFFFFCC80),
                         onTap: () {
-                          Navigator.pushNamed(
+                          Navigator.push(
                             context,
-                            '/gerente/ventas/top-productos',
-                          ).then((_) => _loadDashboard());
+                            MaterialPageRoute(
+                              builder: (_) => const TopProductosScreen(),
+                            ),
+                          ).then((_) => _loadDashboard()); // ✅
                         },
                       ),
                       _buildCard(
                         title: 'Alertas Pendientes',
                         value: '${data.alertasPendientes}',
                         icon: Icons.warning_amber_rounded,
-                        color1: const Color(0xFFC8E6C9),
-                        color2: const Color(0xFFA5D6A7),
+                        color1: const Color(0xFFFFF59D),
+                        color2: const Color(0xFFFFCC80),
                         onTap: () {
-                          Navigator.pushNamed(
+                          Navigator.push(
                             context,
-                            '/gerente/alertas',
-                          ).then((_) => _loadDashboard());
+                            MaterialPageRoute(
+                              builder: (_) => const AlertsScreen(),
+                            ),
+                          ).then((_) => _loadDashboard()); // ✅
                         },
                       ),
                     ],

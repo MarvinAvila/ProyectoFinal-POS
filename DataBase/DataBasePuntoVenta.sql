@@ -1,6 +1,7 @@
 -- =====================================
 -- CREACIÓN DE BASE DE DATOS
 -- =====================================
+-- psql -U postgres
 DROP DATABASE IF EXISTS punto_venta;
 CREATE DATABASE punto_venta;
 \c punto_venta;

@@ -500,7 +500,33 @@ const ventaController = {
     venta.detalles = ModelMapper.toDetalleVentaList(detallesResult.rows);
 
     return venta;
-  }
+  },
+  
+  async topProductos(req, res) {
+    try {
+      const query = `
+        SELECT 
+          p.id_producto,
+          p.nombre AS producto,
+          SUM(dv.cantidad) AS unidades_vendidas,
+          SUM(dv.subtotal) AS total_vendido
+        FROM detalle_venta dv
+        JOIN productos p ON p.id_producto = dv.id_producto
+        GROUP BY p.id_producto, p.nombre
+        ORDER BY total_vendido DESC
+        LIMIT 10;
+      `;
+      const { rows } = await db.query(query);
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      console.error("Error al obtener top productos:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error al obtener el top de productos",
+      });
+    }
+  },
 };
+
 
 module.exports = ventaController;
