@@ -27,6 +27,13 @@ router.get('/top-productos',
     ventaController.topProductos
 );
 
+// GET /ventas/dia - Obtener las ventas del día
+router.get(
+  '/dia',
+  authMiddleware.requireRole(['admin', 'gerente']),
+  ventaController.ventasDelDia
+);
+
 // GET /ventas/:id - Obtener venta por ID (con detalles)
 router.get('/:id', 
     ventaValidations.getById,

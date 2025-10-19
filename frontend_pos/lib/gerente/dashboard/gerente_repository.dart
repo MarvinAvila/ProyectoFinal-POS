@@ -132,6 +132,7 @@ class GerenteDashboardRepository {
       '/dashboard/resumen',
       headers: _authHeaders(),
     );
+    final ventasDia = await _api.get('/ventas/dia', headers: _authHeaders());
 
     // Obtener top de productos (nuevo)
     final top = await _api.get(
@@ -150,6 +151,10 @@ class GerenteDashboardRepository {
       ...Map<String, dynamic>.from(normalized ?? {}),
       'top_productos':
           top is Map && top.containsKey('data') ? top['data'] : top,
+      'ventas_hoy':
+          ventasDia is Map && ventasDia.containsKey('data')
+              ? ventasDia['data']
+              : ventasDia,
     };
 
     // Construir objeto final

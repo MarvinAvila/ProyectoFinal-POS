@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend_pos/gerente/ventas/ventas_dia_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'gerente_repository.dart';
@@ -101,13 +102,14 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
                         color1: const Color(0xFFFFD6E8),
                         color2: const Color(0xFFD1C4E9),
                         onTap: () {
-                          Navigator.pushNamed(
+                          Navigator.push(
                             context,
-                            '/gerente/ventas',
-                            arguments: {'scope': 'hoy'},
-                          ).then((_) {
-                            _loadDashboard();
-                          });
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                      const VentasDiaScreen(), // 👈 Reutiliza la del admin
+                            ),
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                       _buildCard(
