@@ -167,9 +167,7 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
 
                   const SizedBox(height: 24),
                   _buildSectionTitle('Productos más Rentables'),
-                  _buildPlaceholder(
-                    '🏆 ${data.productosRentables.length} productos analizados',
-                  ),
+                  _buildRentablesPreview(context, data.productosRentables),
 
                   const SizedBox(height: 24),
                   _buildSectionTitle('Ventas por Empleado'),
@@ -180,7 +178,10 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
                   const SizedBox(height: 24),
                   _buildSectionTitle('Distribución de Inventario'),
                   _buildPlaceholder(
-                    '🥧 ${data.categoriasDistribucion.length} categorías analizadas',
+                    data.distribucionInventario.isEmpty
+                        ? '🥧 Sin datos de inventario'
+                        : '🥧 ${data.distribucionInventario.length} categorías analizadas\n'
+                            '💰 Valor total: \$${data.distribucionInventario.fold<double>(0, (sum, e) => sum + e.valorInventario).toStringAsFixed(2)}',
                   ),
                 ],
               ),
@@ -342,6 +343,87 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
           text,
           style: const TextStyle(color: Colors.black54, fontSize: 14),
           textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRentablesPreview(BuildContext context, List productos) {
+    if (productos.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(top: 12),
+        height: 160,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.purple.shade100.withOpacity(0.3),
+              blurRadius: 6,
+              offset: const Offset(2, 3),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Text(
+            '🏆 0 productos analizados',
+            style: TextStyle(color: Colors.black54),
+          ),
+        ),
+      );
+    }
+
+    final top = productos.take(3).toList();
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushNamed(context, '/dueno/productos_rentables');
+      },
+      child: Container(
+        margin: const EdgeInsets.only(top: 12),
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.purple.shade100.withOpacity(0.3),
+              blurRadius: 6,
+              offset: const Offset(2, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            for (final p in top)
+              ListTile(
+                leading: const Icon(
+                  Icons.emoji_events,
+                  color: Color(0xFF6A1B9A),
+                ),
+                title: Text(
+                  p.nombre ?? 'Sin nombre',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4A148C),
+                  ),
+                ),
+                trailing: Text(
+                  '+\$${p.ganancia.toStringAsFixed(2)}',
+                  style: const TextStyle(color: Colors.green),
+                ),
+              ),
+            const Divider(),
+            Text(
+              'Ver todos los productos (${productos.length})',
+              style: const TextStyle(
+                color: Color(0xFF4A148C),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
     );

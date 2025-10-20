@@ -12,8 +12,8 @@ class DuenoDashboardData {
   final List<TopProducto> productosRentables; // ⭐ Productos con mayor ganancia
   final List<VentasEmpleado> ventasPorEmpleado; // 👩‍💼 Ranking de empleados
   final int alertasActivas; // ⚠️ Total de alertas sin atender
-  final List<CategoriaDistribucion>
-  categoriasDistribucion; // 🥧 Distribución inventario
+  final List<DistribucionInventario>
+  distribucionInventario; // 🥧 Distribución inventario
 
   const DuenoDashboardData({
     required this.ingresosTotales,
@@ -23,7 +23,7 @@ class DuenoDashboardData {
     required this.productosRentables,
     required this.ventasPorEmpleado,
     required this.alertasActivas,
-    required this.categoriasDistribucion,
+    required this.distribucionInventario,
   });
 
   factory DuenoDashboardData.fromJson(Map<String, dynamic> j) {
@@ -63,11 +63,11 @@ class DuenoDashboardData {
                   .toList()
               : [],
       alertasActivas: _int(j['alertas_activas'] ?? 0),
-      categoriasDistribucion:
-          (j['categorias_distribucion'] is List)
-              ? (j['categorias_distribucion'] as List)
+      distribucionInventario:
+          (j['distribucion_inventario'] is List)
+              ? (j['distribucion_inventario'] as List)
                   .map(
-                    (e) => CategoriaDistribucion.fromJson(
+                    (e) => DistribucionInventario.fromJson(
                       Map<String, dynamic>.from(e),
                     ),
                   )
@@ -132,17 +132,26 @@ class VentasEmpleado {
   }
 }
 
-class CategoriaDistribucion {
+class DistribucionInventario {
   final String categoria;
-  final int cantidad;
+  final int totalProductos;
+  final double valorInventario;
 
-  CategoriaDistribucion({required this.categoria, required this.cantidad});
+  DistribucionInventario({
+    required this.categoria,
+    required this.totalProductos,
+    required this.valorInventario,
+  });
 
-  factory CategoriaDistribucion.fromJson(Map<String, dynamic> j) {
+  factory DistribucionInventario.fromJson(Map<String, dynamic> j) {
     int _int(dynamic v) => v is int ? v : int.tryParse('${v ?? 0}') ?? 0;
-    return CategoriaDistribucion(
+    double _num(dynamic v) =>
+        v is num ? v.toDouble() : double.tryParse('${v ?? 0}') ?? 0.0;
+
+    return DistribucionInventario(
       categoria: j['categoria']?.toString() ?? '',
-      cantidad: _int(j['cantidad'] ?? 0),
+      totalProductos: _int(j['total_productos'] ?? 0),
+      valorInventario: _num(j['valor_inventario'] ?? 0),
     );
   }
 }

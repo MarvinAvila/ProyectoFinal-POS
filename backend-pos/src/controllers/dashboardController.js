@@ -7,12 +7,12 @@ const Alerta = require("../models/Alerta");
 const Reporte = require("../models/Reporte");
 
 const dashboardController = {
- async getResumenCompleto(req, res) {
+async getResumenCompleto(req, res) {
   const client = await db.getClient();
   try {
     await client.query("BEGIN");
 
-    // 1. ESTADÍSTICAS BÁSICAS
+    // 1️⃣ ESTADÍSTICAS BÁSICAS
     const [
       ventasHoyResult,
       totalProductosResult,
@@ -39,8 +39,8 @@ const dashboardController = {
         WHERE DATE_TRUNC('month', fecha) = DATE_TRUNC('month', CURRENT_DATE)
       `),
       client.query("SELECT COUNT(*) as total FROM alertas WHERE atendida = FALSE"),
-      client.query("SELECT COUNT(*) as total FROM categorias"),   // 🟪 NUEVO
-      client.query("SELECT COUNT(*) as total FROM proveedores"),  // 🟩 NUEVO
+      client.query("SELECT COUNT(*) as total FROM categorias"),
+      client.query("SELECT COUNT(*) as total FROM proveedores"),
     ]);
 
     const estadisticasBasicas = {
@@ -59,10 +59,9 @@ const dashboardController = {
       alertas_pendientes: parseInt(alertasPendientesResult.rows[0].total),
       total_categorias: parseInt(totalCategoriasResult.rows[0].total),
       total_proveedores: parseInt(totalProveedoresResult.rows[0].total),
-
     };
 
-    // 2. VENTAS RECIENTES
+    // 2️⃣ VENTAS RECIENTES
     const ventasRecientesResult = await client.query(`
       SELECT v.*, u.nombre as usuario_nombre
       FROM ventas v
@@ -71,19 +70,16 @@ const dashboardController = {
       LIMIT 5
     `);
 
-    // ✅ Evitar el error “toJSON is not a function”
     const ventasRecientes = ventasRecientesResult.rows.map((row) => {
       try {
-        const venta = Venta.fromDatabaseRow
-          ? Venta.fromDatabaseRow(row)
-          : row;
+        const venta = Venta.fromDatabaseRow ? Venta.fromDatabaseRow(row) : row;
         return venta.toJSON ? venta.toJSON() : venta;
       } catch {
-        return row; // fallback seguro
+        return row;
       }
     });
 
-    // 3. PRODUCTOS POPULARES
+    // 3️⃣ PRODUCTOS POPULARES
     const productosPopularesResult = await client.query(`
       SELECT p.*, SUM(dv.cantidad) as total_vendido
       FROM productos p
@@ -97,25 +93,89 @@ const dashboardController = {
 
     const productosPopulares = productosPopularesResult.rows.map((row) => {
       try {
-        const producto = Producto.fromDatabaseRow
-          ? Producto.fromDatabaseRow(row)
-          : row;
+        const producto = Producto.fromDatabaseRow ? Producto.fromDatabaseRow(row) : row;
         return {
           ...(producto.toJSON ? producto.toJSON() : producto),
           total_vendido: parseInt(row.total_vendido) || 0,
-          necesita_reposicion: producto.necesitaReposicion
-            ? producto.necesitaReposicion()
-            : false,
-          por_caducar: producto.estaPorCaducar
-            ? producto.estaPorCaducar()
-            : false,
         };
       } catch {
         return row;
       }
     });
 
-    // 4. ALERTAS
+    // 🟣 4️⃣ PRODUCTOS MÁS RENTABLES
+    const productosRentablesResult = await client.query(`
+      SELECT 
+        p.id_producto,
+        p.nombre,
+        SUM(dv.cantidad) AS cantidad_vendida,
+        SUM(dv.subtotal) AS ingresos,
+        SUM(dv.cantidad * p.precio_compra) AS costos,
+        (SUM(dv.subtotal) - SUM(dv.cantidad * p.precio_compra)) AS ganancia
+      FROM detalle_venta dv
+      JOIN productos p ON p.id_producto = dv.id_producto
+      JOIN ventas v ON v.id_venta = dv.id_venta
+      WHERE v.fecha >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY p.id_producto, p.nombre
+      HAVING SUM(dv.subtotal) > 0
+      ORDER BY ganancia DESC
+      LIMIT 5
+    `);
+
+    const productosRentables = productosRentablesResult.rows.map((row) => ({
+      id_producto: row.id_producto,
+      nombre: row.nombre,
+      cantidad_vendida: parseInt(row.cantidad_vendida),
+      ingresos: parseFloat(row.ingresos),
+      costos: parseFloat(row.costos),
+      ganancia: parseFloat(row.ganancia),
+    }));
+
+    // 🟢 5️⃣ VENTAS POR EMPLEADO (últimos 30 días)
+    const ventasPorEmpleadoResult = await client.query(`
+      SELECT 
+        u.id_usuario,
+        u.nombre AS empleado,
+        COUNT(v.id_venta) AS total_ventas,
+        COALESCE(SUM(v.total), 0) AS ingresos_generados
+      FROM usuarios u
+      LEFT JOIN ventas v ON u.id_usuario = v.id_usuario
+      WHERE u.rol IN ('empleado', 'cajero', 'gerente') 
+        AND v.fecha >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY u.id_usuario, u.nombre
+      HAVING COUNT(v.id_venta) > 0
+      ORDER BY ingresos_generados DESC
+      LIMIT 5
+    `);
+
+    const ventasPorEmpleado = ventasPorEmpleadoResult.rows.map((row) => ({
+      id_usuario: row.id_usuario,
+      empleado: row.empleado,
+      total_ventas: parseInt(row.total_ventas),
+      ingresos_generados: parseFloat(row.ingresos_generados),
+    }));
+
+    // 🟠 6️⃣ DISTRIBUCIÓN DE INVENTARIO POR CATEGORÍA
+    const distribucionInventarioResult = await client.query(`
+      SELECT 
+        c.nombre AS categoria,
+        COUNT(p.id_producto) AS total_productos,
+        COALESCE(SUM(p.stock), 0) AS total_stock,
+        COALESCE(SUM(p.stock * p.precio_compra), 0) AS valor_inventario
+      FROM categorias c
+      LEFT JOIN productos p ON p.id_categoria = c.id_categoria
+      GROUP BY c.id_categoria, c.nombre
+      ORDER BY valor_inventario DESC;
+    `);
+
+    const distribucionInventario = distribucionInventarioResult.rows.map((row) => ({
+      categoria: row.categoria,
+      total_productos: parseInt(row.total_productos),
+      total_stock: parseFloat(row.total_stock),
+      valor_inventario: parseFloat(row.valor_inventario),
+    }));
+
+    // 7️⃣ ALERTAS RECIENTES
     const alertasRecientesResult = await client.query(`
       SELECT a.*, p.nombre as producto_nombre, p.stock
       FROM alertas a
@@ -127,16 +187,14 @@ const dashboardController = {
 
     const alertasRecientes = alertasRecientesResult.rows.map((row) => {
       try {
-        const alerta = Alerta.fromDatabaseRow
-          ? Alerta.fromDatabaseRow(row)
-          : row;
+        const alerta = Alerta.fromDatabaseRow ? Alerta.fromDatabaseRow(row) : row;
         return alerta.toJSON ? alerta.toJSON() : alerta;
       } catch {
         return row;
       }
     });
 
-    // 5. VENTAS POR DÍA
+    // 8️⃣ VENTAS ÚLTIMA SEMANA
     const ventasUltimaSemanaResult = await client.query(`
       SELECT 
         DATE(fecha) as fecha,
@@ -154,56 +212,17 @@ const dashboardController = {
       ingresos: parseFloat(row.ingresos_diarios),
     }));
 
-    // 6. STOCK BAJO (sin cambios)
-    const stockBajoResult = await client.query(`
-      SELECT p.*, c.nombre as categoria_nombre
-      FROM productos p
-      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-      WHERE p.stock <= 5
-      ORDER BY p.stock ASC
-      LIMIT 10
-    `);
-
-    const productosStockBajo = stockBajoResult.rows.map((row) => {
-      const producto = Producto.fromDatabaseRow
-        ? Producto.fromDatabaseRow(row)
-        : row;
-      return {
-        ...(producto.toJSON ? producto.toJSON() : producto),
-        categoria_nombre: row.categoria_nombre,
-        estado: producto.stock === 0 ? "AGOTADO" : "STOCK BAJO",
-      };
-    });
-
-    // 7. REPORTES RECIENTES
-    const reportesRecientesResult = await client.query(`
-      SELECT r.*, u.nombre as usuario_nombre
-      FROM reportes r
-      LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
-      ORDER BY r.fecha_generado DESC
-      LIMIT 5
-    `);
-
-    const reportesRecientes = reportesRecientesResult.rows.map((row) => {
-      try {
-        const reporte = Reporte.fromDatabaseRow
-          ? Reporte.fromDatabaseRow(row)
-          : row;
-        return reporte.toJSON ? reporte.toJSON(false) : reporte;
-      } catch {
-        return row;
-      }
-    });
-
     await client.query("COMMIT");
 
+    // ✅ Resumen final con todas las métricas
     const resumenCompleto = {
       estadisticas: estadisticasBasicas,
       ventas_recientes: ventasRecientes,
       productos_populares: productosPopulares,
+      productos_rentables: productosRentables,
+      ventas_por_empleado: ventasPorEmpleado,
+      distribucion_inventario: distribucionInventario, // ✅ nuevo campo agregado
       alertas_recientes: alertasRecientes,
-      productos_stock_bajo: productosStockBajo,
-      reportes_recientes: reportesRecientes,
       ventas_ultima_semana: ventasPorDia,
       timestamp: new Date().toISOString(),
     };
@@ -228,7 +247,6 @@ const dashboardController = {
     client.release();
   }
 },
-
 
   async getMetricasRapidas(req, res) {
     const client = await db.getClient();
