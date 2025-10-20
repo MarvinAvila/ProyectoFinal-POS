@@ -212,6 +212,25 @@ async getResumenCompleto(req, res) {
       ingresos: parseFloat(row.ingresos_diarios),
     }));
 
+    // 🟣 9️⃣ CRECIMIENTO MENSUAL (últimos 6 meses)
+const crecimientoMensualResult = await client.query(`
+  SELECT 
+    TO_CHAR(DATE_TRUNC('month', fecha), 'Mon') AS mes,
+    COALESCE(SUM(total), 0) AS ingresos
+  FROM ventas
+  WHERE fecha >= CURRENT_DATE - INTERVAL '6 months'
+  GROUP BY DATE_TRUNC('month', fecha)
+  ORDER BY DATE_TRUNC('month', fecha)
+`);
+
+const crecimientoMensual = crecimientoMensualResult.rows.map((row) => ({
+  mes: row.mes,
+  ingresos: parseFloat(row.ingresos),
+}));
+
+
+
+
     await client.query("COMMIT");
 
     // ✅ Resumen final con todas las métricas
@@ -224,6 +243,7 @@ async getResumenCompleto(req, res) {
       distribucion_inventario: distribucionInventario, // ✅ nuevo campo agregado
       alertas_recientes: alertasRecientes,
       ventas_ultima_semana: ventasPorDia,
+      crecimiento_mensual: crecimientoMensual, 
       timestamp: new Date().toISOString(),
     };
 

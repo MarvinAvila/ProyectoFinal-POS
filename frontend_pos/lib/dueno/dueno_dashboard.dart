@@ -7,6 +7,7 @@ import 'package:frontend_pos/dueno/dashboard/dueno_repository.dart'; // ✅ ruta
 import 'package:frontend_pos/alertas/alerts_screen.dart';
 import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
 import 'package:frontend_pos/gerente/ventas/top_productos_screen.dart';
+import 'package:frontend_pos/dueno/dashboard/crecimiento_mensual_chart.dart';
 
 class DuenoDashboard extends StatefulWidget {
   const DuenoDashboard({super.key});
@@ -161,8 +162,21 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
 
                   const SizedBox(height: 24),
                   _buildSectionTitle('Crecimiento Mensual'),
-                  _buildPlaceholder(
-                    '📈 Próximamente: gráfica de crecimiento mensual',
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    height: 260,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.purple.shade100.withOpacity(0.3),
+                          blurRadius: 6,
+                          offset: const Offset(2, 3),
+                        ),
+                      ],
+                    ),
+                    child: CrecimientoMensualChart(datos: data.crecimiento),
                   ),
 
                   const SizedBox(height: 24),
