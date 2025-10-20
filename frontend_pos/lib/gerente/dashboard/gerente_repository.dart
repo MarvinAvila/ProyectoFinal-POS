@@ -125,14 +125,39 @@ class GerenteDashboardRepository {
   /// 🔹 Resumen del dashboard del GERENTE
   /// Endpoint esperado: /dashboard/gerente
   /// Estructura: { data: { estadisticas: {...}, ventas_ultima_semana:[...], top_productos:[...] } }
+  /// 🔹 Resumen del dashboard del GERENTE + Top Productos
   Future<GerenteDashboardData> fetchDashboard() async {
-    final data = await _api.get('/dashboard/resumen', headers: _authHeaders());
-
-    final normalized =
-        (data is Map && data.containsKey('data')) ? data['data'] : data;
-
-    return GerenteDashboardData.fromJson(
-      Map<String, dynamic>.from(normalized ?? {}),
+    // Obtener resumen del dashboard
+    final resumen = await _api.get(
+      '/dashboard/resumen',
+      headers: _authHeaders(),
     );
+    final ventasDia = await _api.get('/ventas/dia', headers: _authHeaders());
+
+    // Obtener top de productos (nuevo)
+    final top = await _api.get(
+      '/ventas/top-productos',
+      headers: _authHeaders(),
+    );
+
+    // Normalizar estructura del resumen
+    final normalized =
+        (resumen is Map && resumen.containsKey('data'))
+            ? resumen['data']
+            : resumen;
+
+    // Fusionar ambos resultados
+    final merged = {
+      ...Map<String, dynamic>.from(normalized ?? {}),
+      'top_productos':
+          top is Map && top.containsKey('data') ? top['data'] : top,
+      'ventas_hoy':
+          ventasDia is Map && ventasDia.containsKey('data')
+              ? ventasDia['data']
+              : ventasDia,
+    };
+
+    // Construir objeto final
+    return GerenteDashboardData.fromJson(Map<String, dynamic>.from(merged));
   }
 }

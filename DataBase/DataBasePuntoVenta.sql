@@ -1,6 +1,7 @@
 -- =====================================
 -- CREACIÓN DE BASE DE DATOS
 -- =====================================
+-- psql -U postgres
 DROP DATABASE IF EXISTS punto_venta;
 CREATE DATABASE punto_venta;
 \c punto_venta;
@@ -302,3 +303,22 @@ INSERT INTO comprobantes (id_venta, tipo, contenido)
 VALUES
   (1, 'ticket', 'Ticket venta #1 - Gracias por su compra'),
   (2, 'ticket', 'Ticket venta #2 - Gracias por su compra');
+
+
+
+
+
+
+
+
+
+
+
+--consulta crecimiento mensual
+SELECT 
+  TO_CHAR(DATE_TRUNC('month', fecha), 'Mon') AS mes,
+  SUM(total) AS total
+FROM ventas
+WHERE fecha >= NOW() - INTERVAL '6 months'
+GROUP BY DATE_TRUNC('month', fecha)
+ORDER BY DATE_TRUNC('month', fecha);

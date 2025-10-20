@@ -21,12 +21,26 @@ router.get('/estadisticas',
     ventaController.getEstadisticas
 );
 
+// GET /ventas/top-productos - Obtener los productos más vendidos
+router.get('/top-productos', 
+    authMiddleware.requireRole(['admin', 'gerente']), // 👈 opcional, ambos pueden acceder
+    ventaController.topProductos
+);
+
+// GET /ventas/dia - Obtener las ventas del día
+router.get(
+  '/dia',
+  authMiddleware.requireRole(['admin', 'gerente']),
+  ventaController.ventasDelDia
+);
+
 // GET /ventas/:id - Obtener venta por ID (con detalles)
 router.get('/:id', 
     ventaValidations.getById,
     ventaValidations.handleValidationErrors,
     ventaController.getById
 );
+
 
 // POST /ventas - Crear nueva venta
 router.post('/', 
