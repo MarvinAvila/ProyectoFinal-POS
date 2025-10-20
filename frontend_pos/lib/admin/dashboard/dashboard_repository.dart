@@ -1,6 +1,7 @@
 // lib/admin/dashboard/dashboard_repository.dart
 import 'package:frontend_pos/core/http.dart';
 import 'package:frontend_pos/auth/auth_service.dart';
+import 'package:intl/intl.dart';
 
 /// ---- Modelos ----
 
@@ -164,21 +165,6 @@ class DashboardRepository {
     final list = asList(normalized);
     return list
         .map((e) => TopProducto.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-  }
-
-  /// 🔹 Ventas por día (gráficas de la última semana)
-  Future<List<SalesPoint>> ventasPorDia() async {
-    // 🚀 Ahora se obtiene del mismo endpoint /dashboard/resumen
-    final data = await _api.get('/dashboard/resumen', headers: _authHeaders());
-
-    final normalized =
-        (data is Map && data.containsKey('data')) ? data['data'] : data;
-
-    final list = asList(normalized['ventas_ultima_semana']);
-
-    return list
-        .map((e) => SalesPoint.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
 }

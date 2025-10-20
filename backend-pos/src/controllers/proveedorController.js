@@ -11,20 +11,20 @@ const proveedorController = {
     try {
       const { q, activo, page = 1, limit = 50 } = req.query;
       const { page: pageNum, limit: limitNum, offset } = helpers.getPaginationParams(req.query);
-      
+
       const params = [];
       const where = [];
       let idx = 1;
 
-      // Filtro por búsqueda de texto
+      // 🔍 Filtro de texto (ya sin campo contacto)
       if (q) {
         const searchTerm = QueryBuilder.sanitizeSearchTerm(q);
-        where.push(`(p.nombre ILIKE $${idx} OR p.contacto ILIKE $${idx} OR p.direccion ILIKE $${idx})`);
+        where.push(`(p.nombre ILIKE $${idx} OR p.direccion ILIKE $${idx})`);
         params.push(searchTerm);
         idx++;
       }
 
-      // Filtro por estado activo (si tienes el campo)
+      // Filtro por estado activo (si existe ese campo)
       if (activo !== undefined) {
         const activoBool = activo === 'true' || activo === '1';
         where.push(`p.activo = $${idx}`);
@@ -44,19 +44,16 @@ const proveedorController = {
         ORDER BY p.nombre ASC 
         LIMIT $${idx} OFFSET $${idx + 1}
       `;
-      
+
       params.push(limitNum, offset);
-      
       const result = await db.query(sql, params);
       const proveedores = ModelMapper.toProveedorList(result.rows);
 
-      // Agregar total de productos a cada proveedor
       proveedores.forEach(proveedor => {
         const row = result.rows.find(r => r.id_proveedor === proveedor.id_proveedor);
         proveedor.total_productos = row ? parseInt(row.total_productos) : 0;
       });
 
-      // Contar total para paginación
       const countSQL = `SELECT COUNT(*) FROM proveedores p ${whereSQL}`;
       const countResult = await db.query(countSQL, params.slice(0, params.length - 2));
       const total = parseInt(countResult.rows[0].count);
@@ -86,7 +83,7 @@ const proveedorController = {
   async getById(req, res) {
     try {
       const id = QueryBuilder.validateId(req.params.id);
-      
+
       const result = await db.query(`
         SELECT p.*, 
                COUNT(pr.id_producto) as total_productos
@@ -95,7 +92,7 @@ const proveedorController = {
         WHERE p.id_proveedor = $1
         GROUP BY p.id_proveedor
       `, [id]);
-      
+
       if (result.rows.length === 0) {
         return responseHelper.notFound(res, 'Proveedor');
       }
@@ -103,7 +100,6 @@ const proveedorController = {
       const proveedor = ModelMapper.toProveedor(result.rows[0]);
       proveedor.total_productos = parseInt(result.rows[0].total_productos);
 
-      // Obtener productos del proveedor si se solicita
       if (req.query.includeProductos === 'true') {
         const productosResult = await db.query(`
           SELECT pr.*, c.nombre as categoria_nombre
@@ -112,12 +108,11 @@ const proveedorController = {
           WHERE pr.id_proveedor = $1
           ORDER BY pr.nombre
         `, [id]);
-        
+
         proveedor.productos = ModelMapper.toProductoList(productosResult.rows);
       }
 
       logger.database('Proveedor obtenido por ID', { id });
-
       return responseHelper.success(res, proveedor);
 
     } catch (error) {
@@ -131,32 +126,26 @@ const proveedorController = {
 
   async create(req, res) {
     const transaction = await db.getClient();
-    
     try {
       await transaction.query('BEGIN');
-      
-      const { nombre, contacto, telefono, direccion, email } = req.body;
 
-      // Validar datos requeridos
+      const { nombre, telefono, direccion, email } = req.body;
+
       if (!nombre || !nombre.trim()) {
         await transaction.query('ROLLBACK');
         return responseHelper.error(res, 'El nombre del proveedor es obligatorio', 400);
       }
 
-      // Sanitizar entrada
       const nombreSanitizado = helpers.sanitizeInput(nombre);
-      const contactoSanitizado = contacto ? helpers.sanitizeInput(contacto) : null;
       const direccionSanitizada = direccion ? helpers.sanitizeInput(direccion) : null;
       const telefonoSanitizado = telefono ? helpers.sanitizeInput(telefono) : null;
       const emailSanitizado = email ? helpers.sanitizeInput(email) : null;
 
-      // Validar email si se proporciona
       if (emailSanitizado && !helpers.isValidEmail(emailSanitizado)) {
         await transaction.query('ROLLBACK');
         return responseHelper.error(res, 'El formato del email no es válido', 400);
       }
 
-      // Crear instancia del proveedor
       const proveedor = new Proveedor(
         null,
         nombreSanitizado,
@@ -165,12 +154,6 @@ const proveedorController = {
         direccionSanitizada
       );
 
-      // Asignar contacto si existe (puedes agregar este campo al modelo si lo necesitas)
-      if (contactoSanitizado) {
-        proveedor.contacto = contactoSanitizado;
-      }
-
-      // Validar proveedor
       const validationErrors = Proveedor.validate(proveedor);
       if (validationErrors.length > 0) {
         await transaction.query('ROLLBACK');
@@ -179,32 +162,23 @@ const proveedorController = {
         });
       }
 
-      // Verificar nombre único
       const proveedorExistente = await transaction.query(
         'SELECT id_proveedor FROM proveedores WHERE nombre ILIKE $1',
         [nombreSanitizado]
       );
-
       if (proveedorExistente.rows.length > 0) {
         await transaction.query('ROLLBACK');
         return responseHelper.conflict(res, 'Ya existe un proveedor con ese nombre');
       }
 
-      // Insertar proveedor
       const result = await transaction.query(
-        `INSERT INTO proveedores (nombre, contacto, telefono, email, direccion)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [
-          proveedor.nombre,
-          proveedor.contacto || contactoSanitizado,
-          proveedor.telefono,
-          proveedor.email,
-          proveedor.direccion
-        ]
+        `INSERT INTO proveedores (nombre, telefono, email, direccion)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [proveedor.nombre, proveedor.telefono, proveedor.email, proveedor.direccion]
       );
 
       await transaction.query('COMMIT');
-      
+
       const proveedorCreado = ModelMapper.toProveedor(result.rows[0]);
 
       logger.audit('Proveedor creado', req.user?.id_usuario, 'CREATE', {
@@ -216,7 +190,6 @@ const proveedorController = {
 
     } catch (error) {
       await transaction.query('ROLLBACK');
-      
       logger.error('Error en create proveedor:', error);
       return responseHelper.error(res, 'Error creando proveedor', 500, error);
     } finally {
@@ -226,14 +199,12 @@ const proveedorController = {
 
   async update(req, res) {
     const transaction = await db.getClient();
-    
     try {
       await transaction.query('BEGIN');
 
       const id = QueryBuilder.validateId(req.params.id);
-      const { nombre, contacto, telefono, direccion, email } = req.body;
+      const { nombre, telefono, direccion, email } = req.body;
 
-      // Verificar que el proveedor existe
       const proveedorExistente = await transaction.query(
         'SELECT * FROM proveedores WHERE id_proveedor = $1',
         [id]
@@ -244,10 +215,8 @@ const proveedorController = {
         return responseHelper.notFound(res, 'Proveedor');
       }
 
-      // Preparar updates
       const updates = {};
       if (nombre !== undefined) updates.nombre = helpers.sanitizeInput(nombre);
-      if (contacto !== undefined) updates.contacto = contacto ? helpers.sanitizeInput(contacto) : null;
       if (telefono !== undefined) updates.telefono = telefono ? helpers.sanitizeInput(telefono) : null;
       if (direccion !== undefined) updates.direccion = direccion ? helpers.sanitizeInput(direccion) : null;
       if (email !== undefined) updates.email = email ? helpers.sanitizeInput(email) : null;
@@ -257,26 +226,23 @@ const proveedorController = {
         return responseHelper.error(res, 'No hay campos para actualizar', 400);
       }
 
-      // Validar email si se está actualizando
       if (updates.email && !helpers.isValidEmail(updates.email)) {
         await transaction.query('ROLLBACK');
         return responseHelper.error(res, 'El formato del email no es válido', 400);
       }
 
-      // Validar nombre único si se está actualizando
       if (updates.nombre) {
         const nombreExistente = await transaction.query(
           'SELECT id_proveedor FROM proveedores WHERE nombre ILIKE $1 AND id_proveedor != $2',
           [updates.nombre, id]
         );
-        
+
         if (nombreExistente.rows.length > 0) {
           await transaction.query('ROLLBACK');
           return responseHelper.conflict(res, 'Ya existe otro proveedor con ese nombre');
         }
       }
 
-      // Crear instancia temporal para validación
       const proveedorActual = proveedorExistente.rows[0];
       const proveedorTemp = new Proveedor(
         id,
@@ -286,14 +252,6 @@ const proveedorController = {
         updates.direccion !== undefined ? updates.direccion : proveedorActual.direccion
       );
 
-      // Asignar contacto si existe
-      if (updates.contacto !== undefined) {
-        proveedorTemp.contacto = updates.contacto;
-      } else if (proveedorActual.contacto) {
-        proveedorTemp.contacto = proveedorActual.contacto;
-      }
-
-      // Validar proveedor actualizado
       const validationErrors = Proveedor.validate(proveedorTemp);
       if (validationErrors.length > 0) {
         await transaction.query('ROLLBACK');
@@ -302,13 +260,7 @@ const proveedorController = {
         });
       }
 
-      const { sql, params } = QueryBuilder.buildUpdateQuery(
-        'proveedores', 
-        updates, 
-        'id_proveedor', 
-        id
-      );
-
+      const { sql, params } = QueryBuilder.buildUpdateQuery('proveedores', updates, 'id_proveedor', id);
       const result = await transaction.query(sql, params);
       await transaction.query('COMMIT');
 
@@ -323,11 +275,10 @@ const proveedorController = {
 
     } catch (error) {
       await transaction.query('ROLLBACK');
-      
       if (error.message === 'ID inválido') {
         return responseHelper.error(res, 'ID de proveedor inválido', 400);
       }
-      
+
       logger.error('Error en update proveedor:', error);
       return responseHelper.error(res, 'Error actualizando proveedor', 500, error);
     } finally {
@@ -337,24 +288,17 @@ const proveedorController = {
 
   async delete(req, res) {
     const transaction = await db.getClient();
-    
     try {
       await transaction.query('BEGIN');
 
       const id = QueryBuilder.validateId(req.params.id);
-
-      // Verificar que el proveedor existe
-      const proveedorExistente = await transaction.query(
-        'SELECT * FROM proveedores WHERE id_proveedor = $1',
-        [id]
-      );
+      const proveedorExistente = await transaction.query('SELECT * FROM proveedores WHERE id_proveedor = $1', [id]);
 
       if (proveedorExistente.rows.length === 0) {
         await transaction.query('ROLLBACK');
         return responseHelper.notFound(res, 'Proveedor');
       }
 
-      // Verificar si hay productos asociados
       const productosAsociados = await transaction.query(
         'SELECT COUNT(*) FROM productos WHERE id_proveedor = $1',
         [id]
@@ -364,13 +308,12 @@ const proveedorController = {
       if (countProductos > 0) {
         await transaction.query('ROLLBACK');
         return responseHelper.error(
-          res, 
-          `No se puede eliminar el proveedor porque tiene ${countProductos} producto(s) asociado(s)`, 
+          res,
+          `No se puede eliminar el proveedor porque tiene ${countProductos} producto(s) asociado(s)`,
           409
         );
       }
 
-      // Eliminar proveedor
       await transaction.query('DELETE FROM proveedores WHERE id_proveedor = $1', [id]);
       await transaction.query('COMMIT');
 
@@ -383,11 +326,10 @@ const proveedorController = {
 
     } catch (error) {
       await transaction.query('ROLLBACK');
-      
       if (error.message === 'ID inválido') {
         return responseHelper.error(res, 'ID de proveedor inválido', 400);
       }
-      
+
       logger.error('Error en delete proveedor:', error);
       return responseHelper.error(res, 'Error eliminando proveedor', 500, error);
     } finally {
@@ -401,17 +343,11 @@ const proveedorController = {
       const { page = 1, limit = 50 } = req.query;
       const { page: pageNum, limit: limitNum, offset } = helpers.getPaginationParams(req.query);
 
-      // Verificar que el proveedor existe
-      const proveedorExistente = await db.query(
-        'SELECT * FROM proveedores WHERE id_proveedor = $1',
-        [id]
-      );
-      
+      const proveedorExistente = await db.query('SELECT * FROM proveedores WHERE id_proveedor = $1', [id]);
       if (proveedorExistente.rows.length === 0) {
         return responseHelper.notFound(res, 'Proveedor');
       }
 
-      // Obtener productos del proveedor
       const productosResult = await db.query(`
         SELECT p.*, c.nombre as categoria_nombre
         FROM productos p
@@ -423,12 +359,11 @@ const proveedorController = {
 
       const productos = ModelMapper.toProductoList(productosResult.rows);
 
-      // Contar total
       const countResult = await db.query(
         'SELECT COUNT(*) FROM productos WHERE id_proveedor = $1',
         [id]
       );
-      
+
       const total = parseInt(countResult.rows[0].count);
 
       logger.database('Productos de proveedor obtenidos', {
@@ -452,7 +387,7 @@ const proveedorController = {
       if (error.message === 'ID inválido') {
         return responseHelper.error(res, 'ID de proveedor inválido', 400);
       }
-      
+
       logger.error('Error obteniendo productos del proveedor:', error);
       return responseHelper.error(res, 'Error obteniendo productos del proveedor', 500, error);
     }
@@ -462,17 +397,15 @@ const proveedorController = {
     try {
       const id = QueryBuilder.validateId(req.params.id);
 
-      // Verificar que el proveedor existe
       const proveedorExistente = await db.query(
         'SELECT * FROM proveedores WHERE id_proveedor = $1',
         [id]
       );
-      
+
       if (proveedorExistente.rows.length === 0) {
         return responseHelper.notFound(res, 'Proveedor');
       }
 
-      // Obtener estadísticas
       const estadisticas = await db.query(`
         SELECT 
           COUNT(*) as total_productos,
@@ -516,7 +449,7 @@ const proveedorController = {
       if (error.message === 'ID inválido') {
         return responseHelper.error(res, 'ID de proveedor inválido', 400);
       }
-      
+
       logger.error('Error obteniendo estadísticas del proveedor:', error);
       return responseHelper.error(res, 'Error obteniendo estadísticas del proveedor', 500, error);
     }

@@ -500,7 +500,88 @@ const ventaController = {
     venta.detalles = ModelMapper.toDetalleVentaList(detallesResult.rows);
 
     return venta;
+  },
+
+  async topProductos(req, res) {
+    try {
+      const query = `
+        SELECT 
+          p.id_producto,
+          p.nombre AS producto,
+          SUM(dv.cantidad) AS unidades_vendidas,
+          SUM(dv.subtotal) AS total_vendido
+        FROM detalle_venta dv
+        JOIN productos p ON p.id_producto = dv.id_producto
+        GROUP BY p.id_producto, p.nombre
+        ORDER BY total_vendido DESC
+        LIMIT 10;
+      `;
+      const { rows } = await db.query(query);
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      console.error("Error al obtener top productos:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error al obtener el top de productos",
+      });
+    }
+  },
+ async ventasDelDia(req, res) {
+  try {
+    const hoy = new Date();
+    const inicioDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const finDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1);
+
+    // 🔹 Consulta para obtener la lista de ventas del día
+    const ventasQuery = `
+      SELECT 
+        v.id_venta,
+        v.fecha,
+        v.forma_pago,
+        v.total,
+        u.nombre AS usuario_nombre
+      FROM ventas v
+      LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+      WHERE v.fecha >= $1 AND v.fecha < $2
+      ORDER BY v.fecha DESC
+    `;
+
+    const ventasResult = await db.query(ventasQuery, [inicioDia, finDia]);
+    const ventas = ventasResult.rows;
+
+    // 🔹 Consulta para los totales del día
+    const totalQuery = `
+      SELECT 
+        COUNT(*) AS total_ventas,
+        COALESCE(SUM(total), 0) AS ingresos_totales
+      FROM ventas
+      WHERE fecha >= $1 AND fecha < $2
+    `;
+
+    const totalResult = await db.query(totalQuery, [inicioDia, finDia]);
+    const resumen = totalResult.rows[0];
+
+    // 🔹 Respuesta unificada para el frontend
+    return res.json({
+      success: true,
+      data: {
+        total_ventas: parseInt(resumen.total_ventas),
+        ingresos_totales: parseFloat(resumen.ingresos_totales),
+        ventas, // 👈 lista detallada de ventas del día
+      },
+    });
+
+  } catch (error) {
+    console.error('Error al obtener ventas del día:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener ventas del día',
+    });
   }
+},
+
+
 };
+
 
 module.exports = ventaController;
