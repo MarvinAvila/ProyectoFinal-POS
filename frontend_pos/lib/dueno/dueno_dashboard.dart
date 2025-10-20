@@ -8,6 +8,7 @@ import 'package:frontend_pos/alertas/alerts_screen.dart';
 import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
 import 'package:frontend_pos/gerente/ventas/top_productos_screen.dart';
 import 'package:frontend_pos/dueno/dashboard/crecimiento_mensual_chart.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class DuenoDashboard extends StatefulWidget {
   const DuenoDashboard({super.key});
@@ -191,12 +192,12 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
 
                   const SizedBox(height: 24),
                   _buildSectionTitle('Distribución de Inventario'),
-                  _buildPlaceholder(
-                    data.distribucionInventario.isEmpty
-                        ? '🥧 Sin datos de inventario'
-                        : '🥧 ${data.distribucionInventario.length} categorías analizadas\n'
-                            '💰 Valor total: \$${data.distribucionInventario.fold<double>(0, (sum, e) => sum + e.valorInventario).toStringAsFixed(2)}',
-                  ),
+                  data.distribucionInventario.isEmpty
+                      ? _buildPlaceholder('🥧 Sin datos de inventario')
+                      : _buildDistribucionInventario(
+                        context,
+                        data.distribucionInventario,
+                      ),
                 ],
               ),
             ),
@@ -439,6 +440,72 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDistribucionInventario(
+    BuildContext context,
+    List distribucionInventario,
+  ) {
+    final totalValor = distribucionInventario.fold<double>(
+      0,
+      (sum, e) => sum + e.valorInventario,
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.shade100.withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(2, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: 220,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 45,
+                sections:
+                    distribucionInventario
+                        .map(
+                          (c) => PieChartSectionData(
+                            title: c.categoria,
+                            value: c.valorInventario,
+                            color:
+                                Colors.primaries[distribucionInventario.indexOf(
+                                      c,
+                                    ) %
+                                    Colors.primaries.length],
+                            radius: 80,
+                            titleStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                        .toList(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '🥐 ${distribucionInventario.length} categorías analizadas\n💰 Valor total: \$${totalValor.toStringAsFixed(2)}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 15, color: Colors.black54),
+          ),
+        ],
       ),
     );
   }
