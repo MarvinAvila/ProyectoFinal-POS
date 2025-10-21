@@ -20,7 +20,7 @@ class CartScreen extends StatelessWidget {
             icon: const Icon(Icons.delete_forever),
             tooltip: 'Vaciar carrito',
             onPressed: () {
-              if (cart.items.isNotEmpty) {
+              if (cart.lines.isNotEmpty) {
                 showDialog(
                   context: context,
                   builder:
@@ -40,7 +40,7 @@ class CartScreen extends StatelessWidget {
                             ),
                             child: const Text('Vaciar'),
                             onPressed: () {
-                              cart.limpiar();
+                              cart.clear();
                               Navigator.pop(ctx);
                             },
                           ),
@@ -53,7 +53,7 @@ class CartScreen extends StatelessWidget {
         ],
       ),
       body:
-          cart.items.isEmpty
+          cart.lines.isEmpty
               ? const Center(
                 child: Text(
                   '🛍️ Tu carrito está vacío',
@@ -64,10 +64,10 @@ class CartScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ListView.builder(
-                      itemCount: cart.items.length,
+                      itemCount: cart.lines.length,
                       itemBuilder: (context, index) {
-                        final item = cart.items.values.elementAt(index);
-                        final producto = item.producto;
+                        final item = cart.lines[index];
+                        final producto = item.product;
 
                         return Card(
                           margin: const EdgeInsets.symmetric(
@@ -108,17 +108,17 @@ class CartScreen extends StatelessWidget {
                               children: [
                                 IconButton(
                                   icon: const Icon(Icons.remove_circle_outline),
-                                  onPressed: () => cart.quitar(producto),
+                                  onPressed: () => cart.decrement(index),
                                 ),
                                 Text(
-                                  '${item.cantidad}',
+                                  '${item.qty}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.add_circle_outline),
-                                  onPressed: () => cart.agregar(producto),
+                                  onPressed: () => cart.increment(index),
                                 ),
                               ],
                             ),
@@ -163,11 +163,25 @@ class CartScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('✅ Venta completada (demo)')),
-              );
-              cart.limpiar();
+            onPressed: cart.loading ? null : () async {
+              final result = await cart.checkout(formaPago: 'efectivo');
+              if (!context.mounted) return;
+
+              if (result != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Venta registrada con éxito'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('❌ Error: ${cart.error ?? 'Desconocido'}'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             icon: const Icon(Icons.check_circle),
             label: const Text('Finalizar venta'),
