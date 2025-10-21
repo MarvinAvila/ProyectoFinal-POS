@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'producto/producto_model.dart';
-import 'producto/producto_repository.dart';
+import 'package:provider/provider.dart';
+import 'package:frontend_pos/empleado/carrito/cart_controller.dart';
+import 'package:frontend_pos/empleado/carrito/cart_screen.dart';
+import 'package:frontend_pos/empleado/producto/producto_model.dart';
+import 'package:frontend_pos/empleado/producto/producto_repository.dart';
 
 class EmpleadoDashboardScreen extends StatefulWidget {
   const EmpleadoDashboardScreen({super.key});
@@ -14,7 +17,6 @@ class EmpleadoDashboardScreen extends StatefulWidget {
 class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
   final repo = ProductoRepository();
   List<Producto> productos = [];
-  final Map<int, int> carrito = {}; // idProducto -> cantidad
   bool cargando = true;
 
   @override
@@ -25,7 +27,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
 
   Future<void> _cargarProductos() async {
     try {
-      final page = await repo.list(limit: 100); // usa tu paginación real
+      final page = await repo.list(limit: 100);
       setState(() {
         productos = page.items;
         cargando = false;
@@ -38,32 +40,9 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     }
   }
 
-  void _agregarAlCarrito(Producto p) {
-    setState(() {
-      carrito[p.idProducto] = (carrito[p.idProducto] ?? 0) + 1;
-    });
-  }
-
-  void _removerDelCarrito(Producto p) {
-    setState(() {
-      if (carrito[p.idProducto] != null) {
-        carrito[p.idProducto] = carrito[p.idProducto]! - 1;
-        if (carrito[p.idProducto]! <= 0) carrito.remove(p.idProducto);
-      }
-    });
-  }
-
-  double get totalCarrito {
-    double total = 0;
-    for (final id in carrito.keys) {
-      final producto = productos.firstWhere((p) => p.idProducto == id);
-      total += (producto.precioFinal * carrito[id]!);
-    }
-    return total;
-  }
-
   @override
   Widget build(BuildContext context) {
+    final cart = context.watch<CartController>();
     final isMobile = MediaQuery.of(context).size.width < 800;
     final currency = NumberFormat.simpleCurrency(locale: 'es_MX');
 
@@ -77,6 +56,36 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: _cargarProductos,
           ),
+          Stack(
+            alignment: Alignment.topRight,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_cart_outlined),
+                tooltip: 'Ver carrito',
+                onPressed: () {
+                  // 🔹 En móvil: mostrar modal
+                  if (isMobile) {
+                    _mostrarCarritoMovil(context, currency, cart);
+                  } else {
+                    // 🔹 En escritorio: navegar a pantalla completa CartScreen
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CartScreen()),
+                    );
+                  }
+                },
+              ),
+              if (cart.cantidadTotal > 0)
+                CircleAvatar(
+                  radius: 9,
+                  backgroundColor: Colors.orange,
+                  child: Text(
+                    '${cart.cantidadTotal}',
+                    style: const TextStyle(fontSize: 10, color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
       body:
@@ -85,7 +94,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
               : Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 🟢 SECCIÓN PRODUCTOS
+                  // 🟢 Productos
                   Expanded(
                     flex: isMobile ? 1 : 3,
                     child: Padding(
@@ -100,173 +109,96 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
                         itemCount: productos.length,
                         itemBuilder: (context, i) {
                           final p = productos[i];
-                          return _buildCardProducto(p, currency);
+                          return _buildCardProducto(p, cart, currency);
                         },
                       ),
                     ),
                   ),
 
-                  // 🟣 SECCIÓN CARRITO (oculta en pantallas pequeñas)
+                  // 🟣 Carrito lateral (solo escritorio/tablet)
                   if (!isMobile)
-                    Expanded(flex: 1, child: _buildCarrito(currency)),
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        color: Colors.white,
+                        child: const CartScreen(),
+                      ),
+                    ),
                 ],
               ),
 
-      // 🟠 Carrito flotante para móviles
+      // 🟠 FAB flotante para móviles
       floatingActionButton:
-          isMobile && carrito.isNotEmpty
+          isMobile && cart.items.isNotEmpty
               ? FloatingActionButton.extended(
-                onPressed: () => _mostrarCarritoMovil(context, currency),
+                onPressed:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CartScreen()),
+                    ),
                 backgroundColor: Colors.deepPurple,
                 icon: const Icon(Icons.shopping_cart),
-                label: Text('${currency.format(totalCarrito)}'),
+                label: Text('${currency.format(cart.total)}'),
               )
               : null,
     );
   }
 
-  // 🧃 Tarjeta individual de producto
-  Widget _buildCardProducto(Producto p, NumberFormat currency) {
-    final enCarrito = carrito.containsKey(p.idProducto);
-    return GestureDetector(
-      onTap: () => _agregarAlCarrito(p),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.purple.withOpacity(0.1),
-              blurRadius: 6,
-              offset: const Offset(2, 3),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          children: [
-            Expanded(
-              child:
-                  p.imagen != null
-                      ? Image.network(p.imagen!, fit: BoxFit.contain)
-                      : const Icon(
-                        Icons.image_not_supported,
-                        size: 60,
-                        color: Colors.grey,
-                      ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              p.nombre,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              maxLines: 2,
-            ),
-            Text(
-              currency.format(p.precioFinal),
-              style: const TextStyle(
-                color: Colors.deepPurple,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (p.enOferta == true)
-              Text(
-                'Oferta ${p.porcentajeDescuento?.toStringAsFixed(0)}%',
-                style: const TextStyle(color: Colors.red, fontSize: 12),
-              ),
-            const SizedBox(height: 4),
-            ElevatedButton.icon(
-              onPressed: () => _agregarAlCarrito(p),
-              icon: const Icon(Icons.add_shopping_cart),
-              label: Text(enCarrito ? 'Agregar +' : 'Agregar'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 36),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 🛒 Panel lateral del carrito
-  Widget _buildCarrito(NumberFormat currency) {
-    if (carrito.isEmpty) {
-      return const Center(
-        child: Text(
-          '🛍️ Carrito vacío',
-          style: TextStyle(color: Colors.black54),
-        ),
-      );
-    }
-
-    final productosCarrito =
-        carrito.keys
-            .map((id) => productos.firstWhere((p) => p.idProducto == id))
-            .toList();
-
+  // 🧃 Tarjeta de producto
+  Widget _buildCardProducto(
+    Producto p,
+    CartController cart,
+    NumberFormat currency,
+  ) {
+    final enCarrito = cart.items.containsKey(p.idProducto);
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '🛒 Carrito',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(2, 3),
           ),
-          const Divider(),
+        ],
+      ),
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        children: [
           Expanded(
-            child: ListView.builder(
-              itemCount: productosCarrito.length,
-              itemBuilder: (context, i) {
-                final p = productosCarrito[i];
-                final cantidad = carrito[p.idProducto]!;
-                return ListTile(
-                  leading:
-                      p.imagen != null
-                          ? Image.network(p.imagen!, width: 40)
-                          : const Icon(Icons.image, color: Colors.grey),
-                  title: Text(p.nombre),
-                  subtitle: Text(currency.format(p.precioFinal)),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () => _removerDelCarrito(p),
-                      ),
-                      Text('$cantidad'),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline),
-                        onPressed: () => _agregarAlCarrito(p),
-                      ),
-                    ],
-                  ),
-                );
-              },
+            child:
+                p.imagen != null
+                    ? Image.network(p.imagen!, fit: BoxFit.contain)
+                    : const Icon(
+                      Icons.image_not_supported,
+                      size: 60,
+                      color: Colors.grey,
+                    ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            p.nombre,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+            maxLines: 2,
+          ),
+          Text(
+            currency.format(p.precioVenta),
+            style: const TextStyle(
+              color: Colors.deepPurple,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const Divider(),
-          Text(
-            'Total: ${currency.format(totalCarrito)}',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Venta registrada (demo)')),
-              );
-              setState(() => carrito.clear());
-            },
-            icon: const Icon(Icons.check_circle),
-            label: const Text('Finalizar venta'),
+            onPressed: () => cart.agregar(p),
+            icon: const Icon(Icons.add_shopping_cart),
+            label: Text(enCarrito ? 'Agregar +' : 'Agregar'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              minimumSize: const Size(double.infinity, 40),
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 36),
             ),
           ),
         ],
@@ -275,7 +207,11 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
   }
 
   // 💬 Carrito emergente en móvil
-  void _mostrarCarritoMovil(BuildContext context, NumberFormat currency) {
+  void _mostrarCarritoMovil(
+    BuildContext context,
+    NumberFormat currency,
+    CartController cart,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -284,7 +220,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
           (_) => SafeArea(
             child: FractionallySizedBox(
               heightFactor: 0.9,
-              child: _buildCarrito(currency),
+              child: CartScreen(), // 👈 ahora usa directamente CartScreen
             ),
           ),
     );
