@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:frontend_pos/admin/services/admin_service.dart';
-import 'package:frontend_pos/gerente/dashboard/gerente_service.dart';
-import 'package:frontend_pos/empleado/services/empleado_service.dart';
+import 'package:frontend_pos/auth/auth_service.dart'; // ✅ Usar el servicio de autenticación central
+import 'package:frontend_pos/core/http.dart'; // ✅ Importar para ApiError
 
 class LoginForm extends StatefulWidget {
   final String rol; // 'admin', 'gerente', 'empleado'
@@ -22,65 +21,76 @@ class _LoginFormState extends State<LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _correoController = TextEditingController();
   final _contrasenaController = TextEditingController();
-  final storage = const FlutterSecureStorage();
+  final _authService = AuthService(); // ✅ Instancia del servicio central
+  final _storage = const FlutterSecureStorage();
 
   String errorMessage = '';
+  bool _loading = false;
 
-  /// 🔐 Lógica de login basada en el rol
-  Future<Map<String, dynamic>> loginPorRol(
-    String email,
-    String password,
-  ) async {
-    switch (widget.rol.toLowerCase()) {
-      case 'admin':
-        return await AdminService.login(email, password);
-      case 'gerente':
-        return await GerenteService.login(email, password);
-      case 'cajero':
-        return await EmpleadoService.login(email, password);
-      default:
-        return {'success': false, 'message': 'Rol desconocido: ${widget.rol}'};
-    }
-  }
+Future<void> _login() async {
+  if (_formKey.currentState!.validate()) {
+    setState(() {
+      _loading = true;
+      errorMessage = '';
+    });
 
-  Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
-      final email = _correoController.text.trim();
-      final password = _contrasenaController.text.trim();
+    final email = _correoController.text.trim();
+    final password = _contrasenaController.text.trim();
 
-      Map<String, dynamic> result = {};
+    print('🔄 [LoginForm] Iniciando login con: $email');
+    
+    try {
+      final result = await _authService.login(email, password);
+      print('✅ [LoginForm] Login exitoso, resultado: $result');
+      print('✅ [LoginForm] Tipo del resultado: ${result.runtimeType}');
+      print('✅ [LoginForm] Keys del resultado: ${result.keys.toList()}');
 
-      switch (widget.rol.toLowerCase()) {
-        case 'admin':
-          result = await AdminService.login(email, password);
-          break;
-        case 'gerente':
-          result = await GerenteService.login(email, password);
-          break;
-        case 'cajero':
-          result = await EmpleadoService.login(email, password);
-          break;
-        default:
-          setState(() {
-            errorMessage = 'Rol desconocido';
-          });
-          return;
-      }
+      // ✅ CORREGIDO: Acceder a la estructura correcta
+      final token = result['token'];
+      final usuario = result['usuario'];
+      
+      print('🔑 [LoginForm] Token: $token');
+      print('👤 [LoginForm] Usuario: $usuario');
+      print('👤 [LoginForm] Tipo de usuario: ${usuario.runtimeType}');
 
-      if (result['success']) {
-        final token = result['token'];
-        await storage.write(key: 'token', value: token);
-        await storage.write(key: 'rol', value: widget.rol);
+      final rolRecibido = usuario?['rol'] ?? '';
+      print('🎭 [LoginForm] Rol recibido: "$rolRecibido"');
+      print('🎭 [LoginForm] Rol esperado: "${widget.rol}"');
 
-        // ✅ Ahora notificamos al AdminLoginScreen (o cualquier rol) que el login fue exitoso
-        widget.onLoginSuccess(token);
-      } else {
+      // Validar que el rol del token coincide con el esperado
+      if (rolRecibido.toLowerCase() != widget.rol.toLowerCase()) {
+        print('❌ [LoginForm] ERROR: Rol no coincide');
+        print('❌ [LoginForm] Esperado: ${widget.rol}, Recibido: $rolRecibido');
         setState(() {
-          errorMessage = result['message'] ?? 'Error al iniciar sesión';
+          errorMessage = 'Credenciales correctas, pero no para el rol de ${widget.rol}.';
         });
+        await ApiClient.setToken(null);
+        return;
       }
+
+      print('✅ [LoginForm] Rol validado correctamente');
+      await _storage.write(key: 'rol', value: widget.rol);
+      print('✅ [LoginForm] Token y rol guardados, ejecutando callback...');
+      widget.onLoginSuccess(token ?? '');
+      print('✅ [LoginForm] Callback ejecutado exitosamente');
+      
+    } on ApiError catch (e) {
+      print('❌ [LoginForm] ApiError: $e');
+      setState(() {
+        errorMessage = e.message;
+      });
+    } catch (e) {
+      print('❌ [LoginForm] Error general: $e');
+      print('❌ [LoginForm] Stack trace: ${e.toString()}');
+      setState(() {
+        errorMessage = 'Error inesperado durante el login: $e';
+      });
+    } finally {
+      setState(() => _loading = false);
+      print('🏁 [LoginForm] Proceso finalizado');
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -112,8 +122,17 @@ class _LoginFormState extends State<LoginForm> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _login,
-            child: Text('Iniciar sesión como ${widget.rol}'),
+            onPressed: _loading ? null : _login,
+            child: _loading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text('Iniciar sesión como ${widget.rol}'),
           ),
           if (errorMessage.isNotEmpty)
             Padding(

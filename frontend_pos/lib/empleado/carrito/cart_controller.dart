@@ -1,15 +1,10 @@
 // lib/carrito/cart_controller.dart
 import 'dart:async';
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
-/// Base de la API desde --dart-define
-const String _kApiBase = String.fromEnvironment(
-  'API_BASE',
-  defaultValue: 'http://localhost:3000',
-);
-
+import 'package:frontend_pos/core/http.dart';
+import 'package:frontend_pos/admin/productos/product_model.dart'; // ✅ Importar el modelo correcto
+import 'package:frontend_pos/admin/productos/product_repository.dart';
+import 'package:frontend_pos/admin/ventas/ventas_repository.dart';
 /// ====== MODELOS ======
 
 class ProductLite {
@@ -31,8 +26,23 @@ class ProductLite {
     this.imagen,
   });
 
+  // ✅ Constructor de fábrica para crear ProductLite desde un Product completo.
+  // Esto es clave para la integración con EmpleadoDashboardScreen.
+  factory ProductLite.fromProduct(Product p) {
+    return ProductLite(
+      id: p.idProducto,
+      nombre: p.nombre,
+      precioVenta: p.precioVenta,
+      stock: p.stock,
+      codigoBarra: p.codigoBarra,
+      unidad: p.unidad,
+      imagen: p.imagen,
+    );
+  }
+
+
   factory ProductLite.fromJson(Map<String, dynamic> j) {
-    double _num(dynamic x) {
+    double parseNum(dynamic x) {
       if (x is num) return x.toDouble();
       return double.tryParse('${x ?? ''}') ?? 0.0;
     }
@@ -45,10 +55,10 @@ class ProductLite {
       nombre: (j['nombre'] ?? j['name'] ?? '').toString(),
       codigoBarra:
           (j['codigo_barra'] ?? j['barcode'] ?? j['codigo'] ?? '') as String?,
-      precioVenta: _num(
+      precioVenta: parseNum(
         j['precio_venta'] ?? j['precioVenta'] ?? j['price'] ?? 0,
       ),
-      stock: _num(j['stock'] ?? j['existencia'] ?? 0),
+      stock: parseNum(j['stock'] ?? j['existencia'] ?? 0),
       unidad: j['unidad']?.toString(),
       imagen: j['imagen']?.toString(),
     );
@@ -71,153 +81,13 @@ class CartLine {
   );
 }
 
-/// ====== API ======
-
-class _CartApi {
-  final Dio _dio;
-  static const _storage = FlutterSecureStorage();
-
-  _CartApi._(this._dio);
-
-  static Future<_CartApi> create() async {
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: '$_kApiBase/api',
-        connectTimeout: const Duration(seconds: 8),
-        receiveTimeout: const Duration(seconds: 15),
-      ),
-    );
-
-    dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (o, h) async {
-          final token = await _storage.read(key: 'token');
-          if (token != null && token.isNotEmpty) {
-            o.headers['Authorization'] = 'Bearer $token';
-          }
-          return h.next(o);
-        },
-      ),
-    );
-
-    return _CartApi._(dio);
-  }
-
-  /// Busca por texto (nombre/código).
-  Future<List<ProductLite>> searchProducts(String query) async {
-    if (query.trim().isEmpty) return [];
-    // Ajusta "query" por "q" si tu backend lo requiere.
-    final res = await _dio.get('/productos', queryParameters: {'query': query});
-    final data = res.data;
-
-    List items;
-    if (data is Map && data['data'] is List) {
-      items = data['data'];
-    } else if (data is List) {
-      items = data;
-    } else {
-      items = [];
-    }
-    return items
-        .map((e) => ProductLite.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-  }
-
-  /// Intenta obtener por barcode con varios fallbacks comunes.
-  Future<ProductLite?> byBarcode(String code) async {
-    // 1) /productos?codigo=xxx
-    try {
-      final res = await _dio.get(
-        '/productos',
-        queryParameters: {'codigo': code},
-      );
-      final data = res.data;
-      if (data is List && data.isNotEmpty) {
-        return ProductLite.fromJson(Map<String, dynamic>.from(data.first));
-      }
-      if (data is Map &&
-          data['data'] is List &&
-          (data['data'] as List).isNotEmpty) {
-        return ProductLite.fromJson(
-          Map<String, dynamic>.from((data['data'] as List).first),
-        );
-      }
-    } catch (_) {}
-
-    // 2) /productos/barcode/:code
-    try {
-      final res = await _dio.get('/productos/barcode/$code');
-      if (res.data is Map) {
-        return ProductLite.fromJson(Map<String, dynamic>.from(res.data as Map));
-      }
-    } catch (_) {}
-
-    // 3) /productos?codigo_barra=xxx
-    try {
-      final res = await _dio.get(
-        '/productos',
-        queryParameters: {'codigo_barra': code},
-      );
-      final data = res.data;
-      if (data is List && data.isNotEmpty) {
-        return ProductLite.fromJson(Map<String, dynamic>.from(data.first));
-      }
-      if (data is Map &&
-          data['data'] is List &&
-          (data['data'] as List).isNotEmpty) {
-        return ProductLite.fromJson(
-          Map<String, dynamic>.from((data['data'] as List).first),
-        );
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  /// Crea una venta con sus detalles.
-  ///
-  /// Body esperado (común en POS):
-  /// {
-  ///   forma_pago: 'efectivo'|'tarjeta'|'otro',
-  ///   subtotal, iva, total,
-  ///   items: [{ id_producto, cantidad, precio_unitario }]
-  /// }
-  Future<Map<String, dynamic>> createSale({
-    required String formaPago,
-    required double subtotal,
-    required double iva,
-    required double total,
-    required List<CartLine> lines,
-    double? montoRecibido,
-  }) async {
-    final payload = {
-      'forma_pago': formaPago,
-      'subtotal': subtotal,
-      'iva': iva,
-      'total': total,
-      if (montoRecibido != null) 'monto_recibido': montoRecibido,
-      'items':
-          lines
-              .map(
-                (l) => {
-                  'id_producto': l.product.id,
-                  'cantidad': l.qty,
-                  'precio_unitario': l.price,
-                },
-              )
-              .toList(),
-    };
-
-    final res = await _dio.post('/ventas', data: payload);
-    return (res.data is Map)
-        ? Map<String, dynamic>.from(res.data)
-        : {'ok': true};
-  }
-}
-
 /// ====== CONTROLLER ======
 
 class CartController extends ChangeNotifier {
-  late final _CartApi _api;
+  // ✅ Usar los repositorios centralizados
+  final _productRepo = ProductRepository();
+  final _ventasRepo = VentasRepository();
+
   final List<CartLine> _lines = [];
   String? _error;
   bool _loading = false;
@@ -234,12 +104,16 @@ class CartController extends ChangeNotifier {
   double get iva => (itemsSubtotal * ivaRate);
   double get total => itemsSubtotal + iva;
 
-  Future<void> init() async {
-    _api = await _CartApi.create();
-  }
+  Future<void> init() async {}
 
   void clearError() {
     _error = null;
+    notifyListeners();
+  }
+
+  /// Vacía el carrito por completo
+  void clear() {
+    _lines.clear();
     notifyListeners();
   }
 
@@ -308,14 +182,17 @@ class CartController extends ChangeNotifier {
   }
 
   /// Buscar por texto para autocompletar
-  Future<List<ProductLite>> search(String query) => _api.searchProducts(query);
+  Future<List<ProductLite>> search(String query) async {
+    final page = await _productRepo.list(search: query, limit: 20);
+    return page.items.map((p) => ProductLite.fromJson(p.toJson())).toList();
+  }
 
   /// Intentar agregar por código de barras
   Future<bool> addByBarcode(String code) async {
     try {
-      final p = await _api.byBarcode(code);
-      if (p == null) return false;
-      addProductLite(p);
+      final p = await _productRepo.byBarcode(code);
+      if (p == null) return false; // No se encontró el producto
+      addProductLite(ProductLite.fromProduct(p)); // ✅ Convertir Product a ProductLite
       return true;
     } catch (e) {
       _error = e.toString();
@@ -334,24 +211,26 @@ class CartController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final resp = await _api.createSale(
-        formaPago: formaPago,
-        subtotal: itemsSubtotal,
-        iva: iva,
-        total: total,
-        lines: _lines,
-        montoRecibido: montoRecibido,
-      );
+      final payload = {
+        'forma_pago': formaPago,
+        'total': total,
+        if (montoRecibido != null) 'monto_recibido': montoRecibido,
+        'detalles': _lines.map((l) => {
+              'id_producto': l.product.id,
+              'cantidad': l.qty,
+              'precio_unitario': l.price,
+            }).toList(),
+      };
+      final resp = await _ventasRepo.createVenta(payload);
       // Limpia carrito si todo ok
       _lines.clear();
-      _loading = false;
-      notifyListeners();
       return resp;
-    } catch (e) {
-      _loading = false;
+    } on ApiError catch (e) {
       _error = e.toString();
-      notifyListeners();
       return null;
+    } finally {
+      _loading = false;
+      notifyListeners();
     }
   }
 }

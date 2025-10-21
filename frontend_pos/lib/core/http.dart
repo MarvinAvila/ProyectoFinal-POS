@@ -76,7 +76,8 @@ class ApiClient {
     }
   }
 
-  static Future<String?> get token async => _storage.read(key: _kTokenKey);
+  /// Lee el token del almacenamiento seguro.
+  static Future<String?> getToken() async => _storage.read(key: _kTokenKey);
 
   // --------- Métodos HTTP genéricos ---------
   Future<dynamic> get(

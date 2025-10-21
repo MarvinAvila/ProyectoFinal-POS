@@ -55,52 +55,63 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  Future<void> iniciarSesion() async {
-    setState(() {
-      cargando = true;
-      error = null;
-    });
+ Future<void> iniciarSesion() async {
+  print('🔄 [LoginScreen] Iniciando sesión...');
+  setState(() {
+    cargando = true;
+    error = null;
+  });
 
-    try {
-      final resultado = await authService.login(
-        correoController.text.trim(),
-        contrasenaController.text.trim(),
-      );
+  try {
+    final resultado = await authService.login(
+      correoController.text.trim(),
+      contrasenaController.text.trim(),
+    );
 
-      if (resultado['success'] == true) {
-        final data = resultado['data'];
-        final usuario = data['usuario'];
-        final token = data['token'];
+    print('✅ [LoginScreen] Respuesta recibida: $resultado');
+    print('✅ [LoginScreen] Keys: ${resultado.keys.toList()}');
 
-        if (usuario['rol'] == widget.role) {
-          const storage = FlutterSecureStorage();
-          await storage.write(key: 'token', value: token);
-          await storage.write(key: 'rol', value: usuario['rol']);
-          // Navegación original
-          if (!mounted) return;
-          Navigator.pushReplacementNamed(context, '/${widget.role}/dashboard');
-        } else {
-          setState(() {
-            error =
-                'Rol incorrecto: este usuario no pertenece a ${widget.role.toUpperCase()}';
-          });
-          _shakeCtrl.forward(from: 0);
-        }
-      } else {
-        setState(() {
-          error = resultado['message'] ?? 'Credenciales inválidas';
-        });
-        _shakeCtrl.forward(from: 0);
-      }
-    } catch (e) {
+    // ✅ CORREGIDO: Acceder directamente a las claves, sin ['data']
+    final usuario = resultado['usuario'];
+    final token = resultado['token'];
+
+    print('👤 [LoginScreen] Usuario: $usuario');
+    print('🔑 [LoginScreen] Token: $token');
+    print('🎭 [LoginScreen] Rol del usuario: ${usuario['rol']}');
+    print('🎭 [LoginScreen] Rol esperado: ${widget.role}');
+
+    if (usuario['rol'] == widget.role) {
+      print('✅ [LoginScreen] Rol coincide, guardando datos...');
+      const storage = FlutterSecureStorage();
+      await storage.write(key: 'token', value: token);
+      await storage.write(key: 'rol', value: usuario['rol']);
+      
+      print('➡️ [LoginScreen] Navegando a /${widget.role}/dashboard');
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/${widget.role}/dashboard');
+      print('✅ [LoginScreen] Navegación completada');
+    } else {
+      print('❌ [LoginScreen] ERROR: Rol no coincide');
+      print('❌ [LoginScreen] Esperado: ${widget.role}, Recibido: ${usuario['rol']}');
       setState(() {
-        error = 'Error al conectar con el servidor: ${e.toString()}';
+        error = 'Rol incorrecto: este usuario no pertenece a ${widget.role.toUpperCase()}';
       });
       _shakeCtrl.forward(from: 0);
-    } finally {
-      if (mounted) setState(() => cargando = false);
+    }
+  } catch (e) {
+    print('❌ [LoginScreen] ERROR: $e');
+    print('❌ [LoginScreen] Stack trace: ${e.toString()}');
+    setState(() {
+      error = 'Error al conectar con el servidor: ${e.toString()}';
+    });
+    _shakeCtrl.forward(from: 0);
+  } finally {
+    if (mounted) {
+      setState(() => cargando = false);
+      print('🏁 [LoginScreen] Proceso finalizado');
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {

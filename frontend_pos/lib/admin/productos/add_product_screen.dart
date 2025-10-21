@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'package:dio/dio.dart';
-import 'product_model.dart';
+import 'product_model.dart'; // ✅ Importar el modelo
+import 'product_repository.dart'; // ✅ Importar el repositorio
 
 class AddProductScreen extends StatefulWidget {
   final Product? product; // 👈 producto opcional para editar o crear
@@ -15,6 +16,7 @@ class AddProductScreen extends StatefulWidget {
 
 class _AddProductScreenState extends State<AddProductScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _repo = ProductRepository(); // ✅ Usar el repositorio
   final _codigoCtrl = TextEditingController();
   final _nombreCtrl = TextEditingController();
   final _precioCompraCtrl = TextEditingController(); // 🆕 Nuevo campo
@@ -64,42 +66,33 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
-    try {
-      final body = {
-        'codigo_barra': _codigoCtrl.text.trim(),
-        'nombre': _nombreCtrl.text.trim(),
-        'precio_compra': double.tryParse(_precioCompraCtrl.text) ?? 0,
-        'precio_venta': double.tryParse(_precioCtrl.text) ?? 0,
-        'stock': double.tryParse(_stockCtrl.text) ?? 0,
-        'unidad': _unidadSeleccionada,
-        'id_categoria': 1, // ⚠️ Ajusta según tu lógica real
-        'id_proveedor': null,
-        'fecha_caducidad': null,
-        'imagen': null,
-      };
+    // ✅ Crear instancia del modelo desde el formulario
+    final producto = Product(
+      idProducto: widget.product?.idProducto ?? 0,
+      codigoBarra: _codigoCtrl.text.trim(),
+      nombre: _nombreCtrl.text.trim(),
+      precioCompra: double.tryParse(_precioCompraCtrl.text) ?? 0,
+      precioVenta: double.tryParse(_precioCtrl.text) ?? 0,
+      stock: double.tryParse(_stockCtrl.text) ?? 0,
+      unidad: _unidadSeleccionada ?? 'pieza',
+      idCategoria: int.tryParse(_categoriaCtrl.text), // ⚠️ Ajusta según tu lógica real
+      idProveedor: null,
+      fechaCaducidad: null,
+    );
 
-      // Si es edición, podrías hacer PUT en lugar de POST
+    try {
       final bool isEdit = widget.product != null;
-      final res =
-          isEdit
-              ? await ApiClient().put(
-                '/productos/${widget.product!.idProducto}',
-                data: body,
-              )
-              : await ApiClient().post('/productos', data: body);
+      if (isEdit) {
+        await _repo.update(producto);
+      } else {
+        await _repo.create(producto);
+      }
 
       if (!mounted) return;
-
-      if (res is Map && res['success'] == true) {
-        _showSuccess(
-          isEdit
-              ? 'Producto actualizado correctamente'
-              : 'Producto agregado correctamente',
-        );
-        Navigator.pop(context, true);
-      } else {
-        _showError(res['message'] ?? 'Error desconocido al guardar');
-      }
+      _showSuccess(
+        isEdit ? 'Producto actualizado' : 'Producto agregado',
+      );
+      Navigator.pop(context, true);
     } on ApiError catch (e) {
       String msg;
       if (e.status == 400 || e.status == 422) {

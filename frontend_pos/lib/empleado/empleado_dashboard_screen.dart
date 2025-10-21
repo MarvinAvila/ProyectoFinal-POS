@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'producto/producto_model.dart';
-import 'producto/producto_repository.dart';
+import 'package:provider/provider.dart';
+import 'package:frontend_pos/admin/productos/product_model.dart';
+import 'package:frontend_pos/admin/productos/product_repository.dart';
+import 'package:frontend_pos/empleado/carrito/cart_controller.dart';
+import 'package:frontend_pos/core/http.dart';
 
 class EmpleadoDashboardScreen extends StatefulWidget {
   const EmpleadoDashboardScreen({super.key});
@@ -12,9 +15,8 @@ class EmpleadoDashboardScreen extends StatefulWidget {
 }
 
 class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
-  final repo = ProductoRepository();
-  List<Producto> productos = [];
-  final Map<int, int> carrito = {}; // idProducto -> cantidad
+  final _productRepo = ProductRepository();
+  List<Product> productos = [];
   bool cargando = true;
 
   @override
@@ -25,12 +27,15 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
 
   Future<void> _cargarProductos() async {
     try {
-      final page = await repo.list(limit: 100); // usa tu paginación real
+      final page = await _productRepo.list(
+        limit: 100,
+      ); // usa tu paginación real
       setState(() {
         productos = page.items;
         cargando = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => cargando = false);
       ScaffoldMessenger.of(
         context,
@@ -38,34 +43,55 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     }
   }
 
-  void _agregarAlCarrito(Producto p) {
-    setState(() {
-      carrito[p.idProducto] = (carrito[p.idProducto] ?? 0) + 1;
-    });
+  // ✅ La lógica de agregar al carrito ahora la maneja el CartController
+  void _agregarAlCarrito(BuildContext context, Product p) {
+    final cart = context.read<CartController>();
+    // Convertimos el Product a ProductLite para el carrito
+    cart.addProductLite(ProductLite.fromProduct(p));
   }
 
-  void _removerDelCarrito(Producto p) {
-    setState(() {
-      if (carrito[p.idProducto] != null) {
-        carrito[p.idProducto] = carrito[p.idProducto]! - 1;
-        if (carrito[p.idProducto]! <= 0) carrito.remove(p.idProducto);
+  Future<void> _finalizarVenta(BuildContext context) async {
+    final cart = context.read<CartController>();
+    if (cart.lines.isEmpty || cart.loading) return;
+
+    try {
+      // ✅ Llamamos al método checkout del controlador del carrito.
+      final result = await cart.checkout(formaPago: 'efectivo');
+
+      if (!mounted) return;
+
+      if (result != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Venta registrada con éxito'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Si es un modal sheet, lo cerramos
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: ${cart.error ?? 'Desconocido'}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-    });
-  }
-
-  double get totalCarrito {
-    double total = 0;
-    for (final id in carrito.keys) {
-      final producto = productos.firstWhere((p) => p.idProducto == id);
-      total += (producto.precioFinal * carrito[id]!);
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Error: ${e.message}')));
     }
-    return total;
   }
 
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 800;
     final currency = NumberFormat.simpleCurrency(locale: 'es_MX');
+    final cart = context.watch<CartController>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F5FB),
@@ -100,7 +126,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
                         itemCount: productos.length,
                         itemBuilder: (context, i) {
                           final p = productos[i];
-                          return _buildCardProducto(p, currency);
+                          return _buildCardProducto(context, p, currency);
                         },
                       ),
                     ),
@@ -108,35 +134,41 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
 
                   // 🟣 SECCIÓN CARRITO (oculta en pantallas pequeñas)
                   if (!isMobile)
-                    Expanded(flex: 1, child: _buildCarrito(currency)),
+                    Expanded(flex: 1, child: _buildCarrito(context, currency)),
                 ],
               ),
 
       // 🟠 Carrito flotante para móviles
       floatingActionButton:
-          isMobile && carrito.isNotEmpty
+          isMobile && cart.lines.isNotEmpty
               ? FloatingActionButton.extended(
-                onPressed: () => _mostrarCarritoMovil(context, currency),
+                onPressed: () => _mostrarCarritoMovil(context),
                 backgroundColor: Colors.deepPurple,
                 icon: const Icon(Icons.shopping_cart),
-                label: Text('${currency.format(totalCarrito)}'),
+                label: Text(currency.format(cart.total)),
               )
               : null,
     );
   }
 
   // 🧃 Tarjeta individual de producto
-  Widget _buildCardProducto(Producto p, NumberFormat currency) {
-    final enCarrito = carrito.containsKey(p.idProducto);
+  Widget _buildCardProducto(
+    BuildContext context,
+    Product p,
+    NumberFormat currency,
+  ) {
+    final enCarrito = context.watch<CartController>().lines.any(
+      (line) => line.product.id == p.idProducto,
+    );
     return GestureDetector(
-      onTap: () => _agregarAlCarrito(p),
+      onTap: () => _agregarAlCarrito(context, p),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.purple.withOpacity(0.1),
+              color: Colors.purple.withAlpha(25), // Reemplazo de withOpacity
               blurRadius: 6,
               offset: const Offset(2, 3),
             ),
@@ -147,7 +179,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
           children: [
             Expanded(
               child:
-                  p.imagen != null
+                  p.imagen != null && p.imagen!.isNotEmpty
                       ? Image.network(p.imagen!, fit: BoxFit.contain)
                       : const Icon(
                         Icons.image_not_supported,
@@ -163,20 +195,15 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
               maxLines: 2,
             ),
             Text(
-              currency.format(p.precioFinal),
+              currency.format(p.precioVenta),
               style: const TextStyle(
                 color: Colors.deepPurple,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            if (p.enOferta == true)
-              Text(
-                'Oferta ${p.porcentajeDescuento?.toStringAsFixed(0)}%',
-                style: const TextStyle(color: Colors.red, fontSize: 12),
-              ),
             const SizedBox(height: 4),
             ElevatedButton.icon(
-              onPressed: () => _agregarAlCarrito(p),
+              onPressed: () => _agregarAlCarrito(context, p),
               icon: const Icon(Icons.add_shopping_cart),
               label: Text(enCarrito ? 'Agregar +' : 'Agregar'),
               style: ElevatedButton.styleFrom(
@@ -192,8 +219,10 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
   }
 
   // 🛒 Panel lateral del carrito
-  Widget _buildCarrito(NumberFormat currency) {
-    if (carrito.isEmpty) {
+  Widget _buildCarrito(BuildContext context, NumberFormat currency) {
+    final cart = context.watch<CartController>();
+
+    if (cart.lines.isEmpty) {
       return const Center(
         child: Text(
           '🛍️ Carrito vacío',
@@ -202,13 +231,8 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
       );
     }
 
-    final productosCarrito =
-        carrito.keys
-            .map((id) => productos.firstWhere((p) => p.idProducto == id))
-            .toList();
-
     return Container(
-      color: Colors.white,
+      color: const Color(0xFFFDFBFF),
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,28 +244,28 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
           const Divider(),
           Expanded(
             child: ListView.builder(
-              itemCount: productosCarrito.length,
+              itemCount: cart.lines.length,
               itemBuilder: (context, i) {
-                final p = productosCarrito[i];
-                final cantidad = carrito[p.idProducto]!;
+                final line = cart.lines[i];
+                final p = line.product;
                 return ListTile(
                   leading:
-                      p.imagen != null
+                      p.imagen != null && p.imagen!.isNotEmpty
                           ? Image.network(p.imagen!, width: 40)
                           : const Icon(Icons.image, color: Colors.grey),
                   title: Text(p.nombre),
-                  subtitle: Text(currency.format(p.precioFinal)),
+                  subtitle: Text(currency.format(line.price)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () => _removerDelCarrito(p),
+                        onPressed: () => cart.decrement(i),
                       ),
-                      Text('$cantidad'),
+                      Text('${line.qty.toInt()}'),
                       IconButton(
                         icon: const Icon(Icons.add_circle_outline),
-                        onPressed: () => _agregarAlCarrito(p),
+                        onPressed: () => cart.increment(i),
                       ),
                     ],
                   ),
@@ -250,20 +274,28 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
             ),
           ),
           const Divider(),
+          // Aquí podrías agregar Subtotal, IVA y Total si quieres más detalle
+          Text('Subtotal: ${currency.format(cart.itemsSubtotal)}'),
+          Text('IVA (16%): ${currency.format(cart.iva)}'),
           Text(
-            'Total: ${currency.format(totalCarrito)}',
+            'Total: ${currency.format(cart.total)}',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           const SizedBox(height: 8),
           ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Venta registrada (demo)')),
-              );
-              setState(() => carrito.clear());
-            },
+            onPressed: cart.loading ? null : () => _finalizarVenta(context),
             icon: const Icon(Icons.check_circle),
-            label: const Text('Finalizar venta'),
+            label:
+                cart.loading
+                    ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : const Text('Finalizar venta'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               minimumSize: const Size(double.infinity, 40),
@@ -275,7 +307,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
   }
 
   // 💬 Carrito emergente en móvil
-  void _mostrarCarritoMovil(BuildContext context, NumberFormat currency) {
+  void _mostrarCarritoMovil(BuildContext context) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -284,7 +316,10 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
           (_) => SafeArea(
             child: FractionallySizedBox(
               heightFactor: 0.9,
-              child: _buildCarrito(currency),
+              child: _buildCarrito(
+                context,
+                NumberFormat.simpleCurrency(locale: 'es_MX'),
+              ),
             ),
           ),
     );

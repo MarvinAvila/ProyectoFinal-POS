@@ -25,14 +25,12 @@ class _VentasDiaScreenState extends State<VentasDiaScreen> {
   Future<void> _cargarVentasDelDia() async {
     try {
       setState(() => cargando = true);
+      // ✅ Petición simplificada. ApiClient maneja URL y token.
       final response = await api.get('/ventas/dia');
 
-      // Esperamos que la API devuelva { success: true, data: { total_ventas, ingresos_totales } }
-      // pero también podemos listar las ventas si agregas un listado
-      final data = response['data'] ?? {};
-
-      // Si tu backend devuelve lista: data['ventas']
-      ventas = data['ventas'] ?? [];
+      // ✅ Usamos los helpers para parsear la respuesta de forma segura.
+      final data = asMap(response);
+      ventas = asList(data['ventas']);
 
       totalDia =
           (data['ingresos_totales'] is num)

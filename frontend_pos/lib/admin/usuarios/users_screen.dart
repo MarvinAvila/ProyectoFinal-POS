@@ -1,104 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'user_model.dart';
-
-/// ==============================
-/// 🔹 API CLIENT PARA USUARIOS
-/// ==============================
-class _UsersApi {
-  final Dio _dio;
-  static const _storage = FlutterSecureStorage();
-
-  _UsersApi._(this._dio);
-
-  static Future<_UsersApi> create() async {
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: 'http://localhost:3000/api', // cambia si usas otro host
-        connectTimeout: const Duration(seconds: 8),
-        receiveTimeout: const Duration(seconds: 15),
-      ),
-    );
-
-    // Middleware para token
-    dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final token = await _storage.read(key: 'token');
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
-          return handler.next(options);
-        },
-      ),
-    );
-
-    return _UsersApi._(dio);
-  }
-
-  /// 🟣 Listar usuarios (GET /usuarios)
-  Future<List<Usuario>> fetchUsers() async {
-    final res = await _dio.get('/usuarios');
-    final data = res.data;
-
-    if (data is Map &&
-        data['data'] is Map &&
-        data['data']['usuarios'] is List) {
-      final list = data['data']['usuarios'] as List;
-      return list
-          .map((e) => Usuario.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
-    }
-
-    throw Exception('Formato de respuesta no reconocido');
-  }
-
-  /// 🟢 Crear usuario (POST /usuarios)
-  Future<Usuario> createUser(Usuario user, String contrasena) async {
-    final payload = {
-      'nombre': user.nombre,
-      'correo': user.correo,
-      'contrasena': contrasena,
-      'rol': user.rol,
-    };
-
-    final res = await _dio.post('/usuarios', data: payload);
-    final data = res.data;
-
-    if (data is Map && data['data'] is Map) {
-      return Usuario.fromJson(Map<String, dynamic>.from(data['data']));
-    }
-    throw Exception('Error al crear usuario');
-  }
-
-  /// 🟡 Actualizar usuario (PUT /usuarios/:id)
-  Future<Usuario> updateUser(Usuario user) async {
-    if (user.idUsuario == null) throw Exception('ID requerido');
-    final res = await _dio.put(
-      '/usuarios/${user.idUsuario}',
-      data: user.toJson(),
-    );
-    final data = res.data;
-
-    if (data is Map && data['data'] is Map) {
-      return Usuario.fromJson(Map<String, dynamic>.from(data['data']));
-    }
-    throw Exception('Error al actualizar usuario');
-  }
-
-  /// 🔴 Eliminar usuario (DELETE /usuarios/:id)
-  Future<void> deleteUser(int id) async {
-    await _dio.delete('/usuarios/$id');
-  }
-}
+import 'users_repository.dart'; // ✅ Importar el repositorio
 
 /// ==============================
 /// 🔹 CONTROLADOR CON PROVIDER
 /// ==============================
 class UsersController extends ChangeNotifier {
-  late final _UsersApi _api;
+  final _repo = UsersRepository(); // ✅ Usar el repositorio
   List<Usuario> _usuarios = [];
   bool _loading = false;
   String? _error;
@@ -108,7 +17,6 @@ class UsersController extends ChangeNotifier {
   String? get error => _error;
 
   Future<void> init() async {
-    _api = await _UsersApi.create();
     await fetchUsers();
   }
 
@@ -118,7 +26,7 @@ class UsersController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _usuarios = await _api.fetchUsers();
+      _usuarios = await _repo.fetchUsers();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -129,7 +37,7 @@ class UsersController extends ChangeNotifier {
 
   Future<void> deleteUser(int id) async {
     try {
-      await _api.deleteUser(id);
+      await _repo.deleteUser(id);
       _usuarios.removeWhere((u) => u.idUsuario == id);
       notifyListeners();
     } catch (e) {

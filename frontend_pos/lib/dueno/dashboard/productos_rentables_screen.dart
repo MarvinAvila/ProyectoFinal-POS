@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
-import 'package:frontend_pos/auth/auth_service.dart';
 
 class ProductosRentablesScreen extends StatefulWidget {
   const ProductosRentablesScreen({super.key});
@@ -25,18 +24,12 @@ class _ProductosRentablesScreenState extends State<ProductosRentablesScreen> {
 
   Future<void> _fetchProductosRentables() async {
     try {
-      final token = AuthService.token;
-      final res = await api.get(
-        '/dashboard/resumen',
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null && token.isNotEmpty)
-            'Authorization': 'Bearer $token',
-        },
-      );
+      // ✅ Petición simplificada. ApiClient añade el token automáticamente.
+      final res = await api.get('/dashboard/resumen');
 
       setState(() {
-        productos = res['productos_populares'] ?? [];
+        // ✅ Usamos los helpers para parsear la respuesta de forma segura.
+        productos = asList(asMap(res)['productos_populares']);
         loading = false;
       });
     } catch (e) {

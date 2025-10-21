@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
-import 'package:frontend_pos/auth/auth_service.dart';
 
 class PromedioVentaScreen extends StatefulWidget {
   const PromedioVentaScreen({super.key});
@@ -24,19 +23,11 @@ class _PromedioVentaScreenState extends State<PromedioVentaScreen> {
 
   Future<void> _fetchPromedioVenta() async {
     try {
-      final token = AuthService.token;
-
-      final res = await api.get(
-        '/dashboard/resumen',
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null && token.isNotEmpty)
-            'Authorization': 'Bearer $token',
-        },
-      );
+      // ✅ Petición simplificada. ApiClient añade el token automáticamente.
+      final res = await api.get('/dashboard/resumen');
 
       setState(() {
-        ventas = res['ventas_recientes'] ?? [];
+        ventas = asList(asMap(res)['ventas_recientes']);
         loading = false;
       });
     } catch (e) {

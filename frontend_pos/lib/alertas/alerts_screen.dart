@@ -1,85 +1,11 @@
 // lib/alertas/alerts_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
+import 'package:frontend_pos/core/http.dart';
+import 'package:frontend_pos/core/env.dart';
 import 'alert_model.dart';
-
-/// Lee la base de la API desde --dart-define
-const String _kApiBase = String.fromEnvironment(
-  'API_BASE',
-  defaultValue: 'http://localhost:3000',
-);
-
-/// Cliente HTTP simple con token opcional (Bearer)
-class _AlertsApi {
-  final Dio _dio;
-
-  _AlertsApi._(this._dio);
-
-  static final _storage = const FlutterSecureStorage();
-
-  static Future<_AlertsApi> create() async {
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: '$_kApiBase/api',
-        connectTimeout: const Duration(seconds: 8),
-        receiveTimeout: const Duration(seconds: 15),
-      ),
-    );
-
-    // Adjunta token si existe
-    dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final token = await _storage.read(key: 'token');
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
-          return handler.next(options);
-        },
-      ),
-    );
-
-    return _AlertsApi._(dio);
-  }
-
-  /// 🔹 Obtiene alertas (todas o solo pendientes según parámetro)
-  Future<List<AlertItem>> fetchAlerts({bool onlyPending = false}) async {
-    final endpoint = onlyPending ? '/alertas/pendientes' : '/alertas';
-    final res = await _dio.get(endpoint);
-    final data = res.data;
-
-    // ✅ Si el backend responde con { data: { alertas: [...] } }
-    if (data is Map && data['data'] is Map && data['data']['alertas'] is List) {
-      return (data['data']['alertas'] as List)
-          .map((e) => AlertItem.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
-    }
-
-    // ✅ Si el backend responde con { data: [ ... ] }
-    if (data is Map && data['data'] is List) {
-      return (data['data'] as List)
-          .map((e) => AlertItem.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
-    }
-
-    throw Exception('Formato de respuesta no reconocido en /alertas');
-  }
-
-  /// Marca una alerta como atendida (PATCH /alertas/:id { atendida: true })
-  Future<void> markAsAttended(int id) async {
-    await _dio.patch('/alertas/$id/atendida');
-  }
-
-  /// Elimina una alerta (si tu backend lo permite)
-  Future<void> deleteAlert(int id) async {
-    await _dio.delete('/alertas/$id');
-  }
-}
 
 /// Estado + lógica con Provider
 class AlertsController extends ChangeNotifier {
@@ -90,7 +16,7 @@ class AlertsController extends ChangeNotifier {
   bool _loading = false;
   bool _onlyPending = true;
 
-  late final _AlertsApi _api;
+  final _api = ApiClient(); // ✅ Usar el cliente centralizado
 
   List<AlertItem> get items =>
       _onlyPending ? _items.where((e) => !e.attended).toList() : _items;
@@ -102,7 +28,6 @@ class AlertsController extends ChangeNotifier {
   String formatDate(DateTime d) => _dateFmt.format(d);
 
   Future<void> init() async {
-    _api = await _AlertsApi.create();
     await refresh();
   }
 
@@ -112,8 +37,14 @@ class AlertsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _items = await _api.fetchAlerts(onlyPending: _onlyPending);
-    } catch (e) {
+      // ✅ Petición simplificada. ApiClient maneja URL y token.
+      final endpoint =
+          _onlyPending ? '${Endpoints.alertas}/pendientes' : Endpoints.alertas;
+      final data = await _api.get(endpoint);
+      // El backend devuelve { alertas: [...] } dentro de la clave 'data'
+      final list = asList(asMap(data)['alertas']);
+      _items = list.map((e) => AlertItem.fromJson(asMap(e))).toList();
+    } on ApiError catch (e) {
       _error = e.toString();
     } finally {
       _loading = false;
@@ -128,13 +59,14 @@ class AlertsController extends ChangeNotifier {
 
   Future<void> markAsAttended(AlertItem a) async {
     try {
-      await _api.markAsAttended(a.id);
+      // ✅ Tu backend espera un PATCH a /alertas/:id/atendida
+      await _api.put('${Endpoints.alertas}/${a.id}/atendida');
       _items =
           _items
               .map((x) => x.id == a.id ? x.copyWith(attended: true) : x)
               .toList();
       notifyListeners();
-    } catch (e) {
+    } on ApiError catch (e) {
       _error = 'No se pudo marcar como atendida: $e';
       notifyListeners();
     }
@@ -142,10 +74,10 @@ class AlertsController extends ChangeNotifier {
 
   Future<void> deleteAlert(AlertItem a) async {
     try {
-      await _api.deleteAlert(a.id);
+      await _api.delete('${Endpoints.alertas}/${a.id}');
       _items.removeWhere((x) => x.id == a.id);
       notifyListeners();
-    } catch (e) {
+    } on ApiError catch (e) {
       _error = 'No se pudo eliminar: $e';
       notifyListeners();
     }

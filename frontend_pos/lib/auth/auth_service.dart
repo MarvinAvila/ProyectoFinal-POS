@@ -1,40 +1,20 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:frontend_pos/core/http.dart'; // ✅ Importa tu ApiClient
+import 'package:frontend_pos/core/http.dart';
+import 'auth_repository.dart';
 
+/// Servicio centralizado para la autenticación.
+/// Utiliza ApiClient para comunicarse con el backend.
 class AuthService {
-  static const String baseUrl = 'http://192.168.1.69:3000/api/auth';
-
-  static String? _token;
-
-  static String? get token => _token;
+  final _repo = AuthRepository();
 
   Future<Map<String, dynamic>> login(String correo, String contrasena) async {
-    final url = Uri.parse('$baseUrl/login');
-
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'correo': correo, 'contrasena': contrasena}),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-
-      if (data['token'] != null) {
-        _token = data['token'];
-        print('🔐 Token guardado correctamente');
-
-        // 🔹 Guardar también en ApiClient para que el interceptor lo use
-        await ApiClient.setToken(_token);
-        print('✅ Token guardado en ApiClient');
-      } else {
-        print('⚠️ No se recibió token en la respuesta');
-      }
-
-      return data;
-    } else {
-      throw Exception('Error de autenticación');
+    try {
+      // ✅ Delega la lógica de login al repositorio.
+      // El repositorio ya se encarga de llamar a la API y guardar el token.
+      return await _repo.login(correo, contrasena);
+    } on ApiError {
+      rethrow; // Lanza el error de API para que la UI pueda mostrarlo.
+    } catch (e) {
+      throw Exception('Error inesperado durante el login: $e');
     }
   }
 }

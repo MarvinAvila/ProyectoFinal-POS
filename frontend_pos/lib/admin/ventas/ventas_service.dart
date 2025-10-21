@@ -1,46 +1,38 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:frontend_pos/core/http.dart';
+import 'package:frontend_pos/core/env.dart';
 
 class VentasService {
-  final String baseUrl; // ej: http://192.168.1.67:3000/api
-  final String token;
-
-  VentasService({required this.baseUrl, required this.token});
+  final _api = ApiClient();
 
   Future<Map<String, dynamic>> estadisticas({
     String? desde,
     String? hasta,
   }) async {
-    final qs = <String, String>{};
-    if (desde != null) qs['fecha_inicio'] = desde;
-    if (hasta != null) qs['fecha_fin'] = hasta;
+    try {
+      final qs = <String, String>{};
+      if (desde != null) qs['fecha_inicio'] = desde;
+      if (hasta != null) qs['fecha_fin'] = hasta;
 
-    final uri = Uri.parse(
-      '$baseUrl/ventas/estadisticas',
-    ).replace(queryParameters: qs.isEmpty ? null : qs);
-    final res = await http.get(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-    if (res.statusCode != 200) {
-      throw Exception('Error obteniendo estadísticas');
+      // ✅ Petición simplificada. ApiClient maneja URL y token.
+      final data = await _api.get('${Endpoints.ventas}/estadisticas', query: qs);
+      return asMap(data);
+    } on ApiError {
+      rethrow;
+    } catch (e) {
+      throw Exception('Error inesperado obteniendo estadísticas: $e');
     }
-    return jsonDecode(res.body)['data'];
   }
 
   Future<List<dynamic>> listar({int page = 1, int limit = 50}) async {
-    final uri = Uri.parse('$baseUrl/ventas?page=$page&limit=$limit');
-    final res = await http.get(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-    if (res.statusCode != 200) throw Exception('Error listando ventas');
-    return (jsonDecode(res.body)['data']['ventas'] as List);
+    try {
+      // ✅ Petición simplificada.
+      final data = await _api.get(Endpoints.ventas, query: {'page': page, 'limit': limit});
+      // ApiClient._parse ya extrae el contenido de 'data', por lo que accedemos a 'ventas'.
+      return asList(asMap(data)['ventas']);
+    } on ApiError {
+      rethrow;
+    } catch (e) {
+      throw Exception('Error inesperado listando ventas: $e');
+    }
   }
 }

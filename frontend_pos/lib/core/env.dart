@@ -1,22 +1,21 @@
 // lib/core/env.dart
-import 'dart:io';
 
-/// Lee la base de la API desde --dart-define=API_BASE
-/// Ej.: flutter run --dart-define=API_BASE=http://localhost:3000
+/// ==================================================
+/// 🔹 CONFIGURACIÓN DE ENTORNO Y ENDPOINTS DE LA API
+/// ==================================================
+///
+/// Por defecto, la app se conectará a la URL de producción en Render.
+/// Para desarrollo local, ejecuta:
+/// flutter run --dart-define=API_BASE=http://localhost:3000
 class Env {
   static const String _kBase = String.fromEnvironment(
     'API_BASE',
-    defaultValue: 'http://localhost:3000',
+    // ✅ Render es ahora la URL por defecto
+    defaultValue: 'https://proyectofinal-pos.onrender.com',
   );
 
   /// Base de la API (sin /api al final)
-  static String get apiBase {
-    // Si corres en emulador Android y tu backend está en tu máquina:
-    // if (Platform.isAndroid && _kBase.contains('localhost')) {
-    //   return 'http://10.0.2.2:3000';
-    // }
-    return _kBase;
-  }
+  static String get apiBase => _kBase;
 
   /// Prefija todas las rutas con /api
   static String get apiRoot => '$apiBase/api';
