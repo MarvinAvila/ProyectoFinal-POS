@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
-import 'package:frontend_pos/auth/auth_service.dart'; // 👈 Asegúrate de importar esto arriba
 
 class IvaRecaudadoScreen extends StatefulWidget {
   const IvaRecaudadoScreen({super.key});
@@ -24,19 +23,10 @@ class _IvaRecaudadoScreenState extends State<IvaRecaudadoScreen> {
 
   Future<void> _fetchIvaRecaudado() async {
     try {
-      // 🟣 Obtenemos el token actual
-      final token = AuthService.token;
-
-      final res = await api.get(
-        '/dashboard/resumen',
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null && token.isNotEmpty)
-            'Authorization': 'Bearer $token',
-        },
-      );
-
-      final ventasRecientes = res['ventas_recientes'] ?? [];
+      // ✅ Petición simplificada. ApiClient añade el token automáticamente.
+      final res = await api.get('/dashboard/resumen');
+      // ✅ Usamos los helpers para parsear la respuesta de forma segura.
+      final ventasRecientes = asList(asMap(res)['ventas_recientes']);
 
       setState(() {
         ventas = ventasRecientes;

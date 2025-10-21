@@ -1,29 +1,42 @@
 import 'package:frontend_pos/core/http.dart';
-import 'auth_service.dart';
+import 'package:frontend_pos/core/env.dart';
 
 class AuthRepository {
   final ApiClient _api = ApiClient();
 
-  /// 🔹 Inicia sesión (login)
   Future<Map<String, dynamic>> login(String correo, String contrasena) async {
-    final response = await _api.post(
-      '/auth/login',
-      data: {'correo': correo, 'contrasena': contrasena},
-    );
+    print('🔐 [AuthRepository] Iniciando login para: $correo');
+    
+    try {
+      final response = await _api.post(
+        Endpoints.authLogin,
+        data: {'correo': correo, 'contrasena': contrasena},
+      );
 
-    if (response == null || response is! Map) {
-      throw Exception('Error: respuesta inválida del servidor.');
+      print('📥 [AuthRepository] Respuesta recibida: $response');
+      print('📥 [AuthRepository] Tipo de respuesta: ${response.runtimeType}');
+
+      final data = asMap(response);
+      print('📊 [AuthRepository] Data convertida: $data');
+      print('📊 [AuthRepository] Keys del data: ${data.keys.toList()}');
+
+      if (data.containsKey('token')) {
+        print('✅ [AuthRepository] Token encontrado, guardando...');
+        await ApiClient.setToken(data['token']);
+        print('✅ [AuthRepository] Token guardado exitosamente');
+      } else {
+        print('❌ [AuthRepository] No se encontró token en la respuesta');
+        print('❌ [AuthRepository] Contenido completo: $data');
+      }
+      
+      return data;
+    } catch (e) {
+      print('💥 [AuthRepository] Error durante login: $e');
+      rethrow;
     }
-
-    final data = Map<String, dynamic>.from(response);
-    if (data.containsKey('token')) {
-      await ApiClient.setToken(data['token']);
-    }
-
-    return data;
   }
 
-  /// 🔹 Registro de nuevos usuarios
+  // ... el resto de los métodos permanece igual
   Future<Map<String, dynamic>> register({
     required String nombre,
     required String correo,
@@ -40,40 +53,25 @@ class AuthRepository {
       },
     );
 
-    if (response == null || response is! Map) {
-      throw Exception('Error: respuesta inválida del servidor.');
-    }
-
-    final data = Map<String, dynamic>.from(response);
+    final data = asMap(response);
     if (data.containsKey('token')) {
       await ApiClient.setToken(data['token']);
     }
-
+    
     return data;
   }
 
-  /// 🔹 Cierra sesión limpiando el token guardado
   Future<void> logout() async {
     await ApiClient.setToken(null);
   }
 
-  /// 🔹 Verifica si el usuario tiene sesión activa
   Future<bool> isAuthenticated() async {
-    final token = AuthService.token;
+    final token = await ApiClient.getToken();
     return token != null && token.isNotEmpty;
   }
 
-  /// 🔹 Obtiene el perfil del usuario autenticado
   Future<Map<String, dynamic>> fetchPerfil() async {
-    final response = await _api.get(
-      '/auth/perfil',
-      headers: {'Authorization': 'Bearer ${AuthService.token}'},
-    );
-
-    if (response == null || response is! Map) {
-      throw Exception('Error: respuesta inválida al obtener perfil.');
-    }
-
-    return Map<String, dynamic>.from(response);
+    final response = await _api.get(Endpoints.authMe);
+    return asMap(response);
   }
 }

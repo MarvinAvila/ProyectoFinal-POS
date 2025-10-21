@@ -6,12 +6,6 @@ import '../../core/http.dart'; // ApiClient, asMap, asList, ApiError
 import '../../core/env.dart'; // Endpoints (ver nota abajo)
 import '../../core/widgets.dart'; // AppLoader, ErrorView, EmptyView
 
-/// Nota rápida:
-/// Asegúrate de tener en lib/core/env.dart algo así:
-///   static const reportesVentas = '/reportes/ventas';
-///   static const reportesTopProductos = '/reportes/top-productos';
-/// Si tus rutas reales son distintas, solo ajusta los nombres abajo.
-
 class ReportesScreen extends StatefulWidget {
   const ReportesScreen({super.key});
 
@@ -101,15 +95,8 @@ class _ReportesScreenState extends State<ReportesScreen> {
 
       // ===== Resumen ventas =====
       final dataResumen = await _api.get(Endpoints.reportesVentas, query: qp);
-      Map<String, dynamic> m;
-      if (dataResumen is Map && dataResumen['data'] != null) {
-        m = asMap(dataResumen['data']);
-      } else if (dataResumen is Map) {
-        m = asMap(dataResumen);
-      } else {
-        m = {};
-      }
-
+      // ✅ Simplificado. ApiClient._parse ya extrae el contenido de 'data'.
+      final m = asMap(dataResumen);
       final total = _num(m['total'] ?? m['ventas_total'] ?? m['totalVentas']);
       final iva = _num(m['iva'] ?? m['impuesto'] ?? m['tax']);
       final subtotal = _num(m['subtotal'] ?? m['sub_total'] ?? (total - iva));
@@ -146,17 +133,9 @@ class _ReportesScreenState extends State<ReportesScreen> {
 
       // ===== Top productos =====
       final dataTop = await _api.get(Endpoints.reportesTopProductos, query: qp);
-      List list;
-      if (dataTop is Map && dataTop['data'] is List) {
-        list = asList(dataTop['data']);
-      } else if (dataTop is List) {
-        list = asList(dataTop);
-      } else {
-        list = const [];
-      }
-
-      final top =
-          list.map<_TopRow>((e) {
+      // ✅ Simplificado. ApiClient._parse ya devuelve la lista directamente.
+      final top = asList(dataTop)
+          .map<_TopRow>((e) {
             final x = Map<String, dynamic>.from(e);
             final nombre =
                 (x['nombre'] ?? x['producto'] ?? x['name'] ?? '').toString();
@@ -175,6 +154,8 @@ class _ReportesScreenState extends State<ReportesScreen> {
         _pagos = pagos;
         _top = top;
       });
+    } on ApiError catch (e) {
+      setState(() => _error = 'Error de API: ${e.message}');
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {

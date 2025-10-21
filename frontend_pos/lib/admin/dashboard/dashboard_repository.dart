@@ -1,7 +1,5 @@
 // lib/admin/dashboard/dashboard_repository.dart
 import 'package:frontend_pos/core/http.dart';
-import 'package:frontend_pos/auth/auth_service.dart';
-import 'package:intl/intl.dart';
 
 /// ---- Modelos ----
 
@@ -32,20 +30,20 @@ class DashboardData {
     // 🔹 El backend devuelve los datos dentro de "estadisticas"
     final stats = j['estadisticas'] ?? {};
     final ventasSemana = j['ventas_ultima_semana'] ?? [];
-
-    double _num(dynamic v) =>
+ 
+    double parseNum(dynamic v) =>
         v is num ? v.toDouble() : double.tryParse('${v ?? 0}') ?? 0.0;
-    int _int(dynamic v) => v is int ? v : int.tryParse('${v ?? 0}') ?? 0;
+    int parseInt(dynamic v) => v is int ? v : int.tryParse('${v ?? 0}') ?? 0;
 
     return DashboardData(
-      ventasHoy: _num(stats['ventas_hoy']?['ingresos'] ?? 0),
-      ventasMes: _num(stats['ventas_mes']?['ingresos'] ?? 0),
-      totalVentasHoy: _int(stats['ventas_hoy']?['total'] ?? 0),
-      totalProductos: _int(stats['total_productos'] ?? 0),
-      totalCategorias: _int(stats['total_categorias'] ?? 0),
-      totalProveedores: _int(stats['total_proveedores'] ?? 0),
-      totalUsuarios: _int(stats['total_usuarios'] ?? 0),
-      alertasPendientes: _int(stats['alertas_pendientes'] ?? 0),
+      ventasHoy: parseNum(stats['ventas_hoy']?['ingresos'] ?? 0),
+      ventasMes: parseNum(stats['ventas_mes']?['ingresos'] ?? 0),
+      totalVentasHoy: parseInt(stats['ventas_hoy']?['total'] ?? 0),
+      totalProductos: parseInt(stats['total_productos'] ?? 0),
+      totalCategorias: parseInt(stats['total_categorias'] ?? 0),
+      totalProveedores: parseInt(stats['total_proveedores'] ?? 0),
+      totalUsuarios: parseInt(stats['total_usuarios'] ?? 0),
+      alertasPendientes: parseInt(stats['alertas_pendientes'] ?? 0),
 
       // ✅ Mapear ventas_ultima_semana del backend
       ventasUltimaSemana:
@@ -72,15 +70,15 @@ class TopProducto {
   });
 
   factory TopProducto.fromJson(Map<String, dynamic> j) {
-    double _num(dynamic v) =>
+    double parseNum(dynamic v) =>
         v is num ? v.toDouble() : double.tryParse('${v ?? 0}') ?? 0.0;
-    int _int(dynamic v) => v is int ? v : int.tryParse('${v ?? 0}') ?? 0;
+    int parseInt(dynamic v) => v is int ? v : int.tryParse('${v ?? 0}') ?? 0;
 
     return TopProducto(
-      id: _int(j['id'] ?? j['id_producto']),
+      id: parseInt(j['id'] ?? j['id_producto']),
       nombre: (j['nombre'] ?? j['producto'] ?? '').toString(),
-      vendidos: _num(j['vendidos'] ?? j['cantidad'] ?? 0),
-      total: _num(j['total'] ?? j['importe'] ?? j['monto'] ?? 0),
+      vendidos: parseNum(j['vendidos'] ?? j['cantidad'] ?? 0),
+      total: parseNum(j['total'] ?? j['importe'] ?? j['monto'] ?? 0),
     );
   }
 }
@@ -114,55 +112,33 @@ class SalesPoint {
 class DashboardRepository {
   final _api = ApiClient();
 
-  /// Helper privado que agrega token a los headers
-  Map<String, String> _authHeaders() {
-    final token = AuthService.token;
-    return {
-      'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
   /// 🔹 Resumen general del dashboard (datos + gráficas)
   Future<DashboardData> fetchDashboard() async {
-    final data = await _api.get('/dashboard/resumen', headers: _authHeaders());
-
-    // 🔸 Estructura esperada: { data: { estadisticas: {...}, ventas_ultima_semana: [...], ... } }
-    final normalized =
-        (data is Map && data.containsKey('data')) ? data['data'] : data;
-
-    return DashboardData.fromJson(Map<String, dynamic>.from(normalized ?? {}));
+    // ✅ Petición simplificada. El token se añade automáticamente por el interceptor.
+    // El método _parse de ApiClient ya extrae el contenido de 'data' si existe.
+    final data = await _api.get('/dashboard/resumen');
+    return DashboardData.fromJson(asMap(data));
   }
 
   /// 🔹 Métricas rápidas
   Future<Map<String, dynamic>> fetchMetricasRapidas() async {
-    final data = await _api.get(
-      '/dashboard/metricas-rapidas',
-      headers: _authHeaders(),
-    );
-    final normalized =
-        (data is Map && data.containsKey('data')) ? data['data'] : data;
-    return asMap(normalized);
+    // ✅ Petición simplificada.
+    final data = await _api.get('/dashboard/metricas-rapidas');
+    return asMap(data);
   }
 
   /// 🔹 Alertas del dashboard
   Future<List<Map<String, dynamic>>> fetchAlertas() async {
-    final data = await _api.get('/dashboard/alertas', headers: _authHeaders());
-    final normalized =
-        (data is Map && data.containsKey('data')) ? data['data'] : data;
-    return asList(normalized).map((e) => Map<String, dynamic>.from(e)).toList();
+    // ✅ Petición simplificada.
+    final data = await _api.get('/dashboard/alertas');
+    return asList(data).map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
   /// 🔹 Productos más vendidos
   Future<List<TopProducto>> fetchTopProductos({int limit = 5}) async {
-    final data = await _api.get(
-      '/dashboard/top-productos',
-      query: {'limit': limit},
-      headers: _authHeaders(),
-    );
-    final normalized =
-        (data is Map && data.containsKey('data')) ? data['data'] : data;
-    final list = asList(normalized);
+    // ✅ Petición simplificada.
+    final data = await _api.get('/dashboard/top-productos', query: {'limit': limit});
+    final list = asList(data);
     return list
         .map((e) => TopProducto.fromJson(Map<String, dynamic>.from(e)))
         .toList();

@@ -103,4 +103,23 @@ class ProductRepository {
   Future<void> delete(int id) async {
     await _api.delete('${Endpoints.productos}/$id');
   }
+
+  /// Busca un producto por su código de barras.
+  Future<Product?> byBarcode(String code) async {
+    try {
+      // Asumimos que el backend tiene una ruta optimizada para esto.
+      final data = await _api.get('${Endpoints.productos}/barcode/$code');
+      return Product.fromJson(asMap(data));
+    } on ApiError catch (e) {
+      // Si el backend devuelve 404 (Not Found), es un caso esperado.
+      if (e.status == 404) {
+        return null;
+      }
+      // Para otros errores, relanzamos la excepción.
+      rethrow;
+    } catch (e) {
+      // Manejo de otros errores inesperados.
+      throw Exception('Error inesperado al buscar por código de barras: $e');
+    }
+  }
 }

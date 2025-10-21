@@ -11,36 +11,54 @@ class LoginController with ChangeNotifier {
     String contrasena,
     BuildContext context,
   ) async {
+    print('🎯 [LoginController] Iniciando login...');
     isLoading = true;
     notifyListeners();
 
     try {
       final data = await _authService.login(correo, contrasena);
-      final rol = data['usuario']['rol'];
+      print('📦 [LoginController] Data recibida: $data');
+      print('📦 [LoginController] Keys: ${data.keys.toList()}');
+      
+      final usuario = data['usuario'];
+      final rol = usuario['rol'];
+      
+      print('🎭 [LoginController] Rol detectado: $rol');
+      print('🎭 [LoginController] Usuario completo: $usuario');
 
-      // Redirigir según el rol
+      // ✅ CORREGIDO: Usar las rutas exactas de tu main.dart
       switch (rol) {
         case 'admin':
-          Navigator.pushReplacementNamed(context, '/admin');
+          print('➡️ [LoginController] Navegando a /admin/dashboard');
+          Navigator.pushReplacementNamed(context, '/admin/dashboard');
           break;
         case 'gerente':
-          Navigator.pushReplacementNamed(context, '/gerente');
+          print('➡️ [LoginController] Navegando a /gerente/dashboard');
+          Navigator.pushReplacementNamed(context, '/gerente/dashboard');
           break;
         case 'dueno':
-          Navigator.pushReplacementNamed(context, '/dueno');
+          print('➡️ [LoginController] Navegando a /dueno/dashboard');
+          Navigator.pushReplacementNamed(context, '/dueno/dashboard');
           break;
         case 'cajero':
-          Navigator.pushReplacementNamed(context, '/cajero');
+          print('➡️ [LoginController] Navegando a /cajero/dashboard');
+          Navigator.pushReplacementNamed(context, '/cajero/dashboard');
           break;
         default:
-          throw Exception('Rol desconocido');
+          print('❌ [LoginController] Rol desconocido: $rol');
+          throw Exception('Rol desconocido: $rol');
       }
+      
+      print('✅ [LoginController] Navegación completada exitosamente');
     } catch (e) {
-      errorMessage = 'Credenciales incorrectas';
+      print('❌ [LoginController] Error: $e');
+      print('❌ [LoginController] Stack trace: ${e.toString()}');
+      errorMessage = 'Error al conectar con el servidor: $e';
       notifyListeners();
     } finally {
       isLoading = false;
       notifyListeners();
+      print('🏁 [LoginController] Proceso de login finalizado');
     }
   }
 }

@@ -1,5 +1,5 @@
 import 'package:frontend_pos/core/http.dart';
-import 'package:frontend_pos/auth/auth_service.dart';
+import 'package:frontend_pos/core/env.dart';
 
 /// ---- Modelo principal ----
 /// Representa toda la información que el Dashboard del Dueño muestra.
@@ -160,23 +160,14 @@ class DistribucionInventario {
 class DuenoDashboardRepository {
   final _api = ApiClient();
 
-  Map<String, String> _authHeaders() {
-    final token = AuthService.token;
-    return {
-      'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
   /// 🔹 Obtiene datos del Dashboard del Dueño desde el backend
-  /// Endpoint: /api/dashboard/dueno
+  /// Endpoint: /api/dashboard/resumen
   Future<DuenoDashboardData> fetchDashboard() async {
-    final data = await _api.get('/dashboard/resumen', headers: _authHeaders());
-    final normalized =
-        (data is Map && data.containsKey('data')) ? data['data'] : data;
-
+    // ✅ Petición simplificada. El token se añade automáticamente por el interceptor.
+    // El método _parse de ApiClient ya extrae el contenido de 'data' si existe.
+    final data = await _api.get(Endpoints.dashboardResumen);
     return DuenoDashboardData.fromJson(
-      Map<String, dynamic>.from(normalized ?? {}),
+      Map<String, dynamic>.from(data ?? {}),
     );
   }
 }

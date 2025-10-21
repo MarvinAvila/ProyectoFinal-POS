@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:frontend_pos/admin/productos/product_model.dart';
+import 'package:frontend_pos/admin/productos/product_repository.dart';
 import 'package:frontend_pos/empleado/carrito/cart_controller.dart';
-import 'package:frontend_pos/empleado/carrito/cart_screen.dart';
-import 'package:frontend_pos/empleado/producto/producto_model.dart';
-import 'package:frontend_pos/empleado/producto/producto_repository.dart';
+import 'package:frontend_pos/core/http.dart';
 
 class EmpleadoDashboardScreen extends StatefulWidget {
   const EmpleadoDashboardScreen({super.key});
@@ -15,8 +15,8 @@ class EmpleadoDashboardScreen extends StatefulWidget {
 }
 
 class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
-  final repo = ProductoRepository();
-  List<Producto> productos = [];
+  final _productRepo = ProductRepository();
+  List<Product> productos = [];
   bool cargando = true;
 
   @override
@@ -27,12 +27,15 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
 
   Future<void> _cargarProductos() async {
     try {
-      final page = await repo.list(limit: 100);
+      final page = await _productRepo.list(
+        limit: 100,
+      ); // usa tu paginación real
       setState(() {
         productos = page.items;
         cargando = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => cargando = false);
       ScaffoldMessenger.of(
         context,
@@ -40,11 +43,55 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     }
   }
 
+  // ✅ La lógica de agregar al carrito ahora la maneja el CartController
+  void _agregarAlCarrito(BuildContext context, Product p) {
+    final cart = context.read<CartController>();
+    // Convertimos el Product a ProductLite para el carrito
+    cart.addProductLite(ProductLite.fromProduct(p));
+  }
+
+  Future<void> _finalizarVenta(BuildContext context) async {
+    final cart = context.read<CartController>();
+    if (cart.lines.isEmpty || cart.loading) return;
+
+    try {
+      // ✅ Llamamos al método checkout del controlador del carrito.
+      final result = await cart.checkout(formaPago: 'efectivo');
+
+      if (!mounted) return;
+
+      if (result != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Venta registrada con éxito'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Si es un modal sheet, lo cerramos
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: ${cart.error ?? 'Desconocido'}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Error: ${e.message}')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cart = context.watch<CartController>();
     final isMobile = MediaQuery.of(context).size.width < 800;
     final currency = NumberFormat.simpleCurrency(locale: 'es_MX');
+    final cart = context.watch<CartController>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F5FB),
@@ -56,36 +103,6 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: _cargarProductos,
           ),
-          Stack(
-            alignment: Alignment.topRight,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined),
-                tooltip: 'Ver carrito',
-                onPressed: () {
-                  // 🔹 En móvil: mostrar modal
-                  if (isMobile) {
-                    _mostrarCarritoMovil(context, currency, cart);
-                  } else {
-                    // 🔹 En escritorio: navegar a pantalla completa CartScreen
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartScreen()),
-                    );
-                  }
-                },
-              ),
-              if (cart.cantidadTotal > 0)
-                CircleAvatar(
-                  radius: 9,
-                  backgroundColor: Colors.orange,
-                  child: Text(
-                    '${cart.cantidadTotal}',
-                    style: const TextStyle(fontSize: 10, color: Colors.white),
-                  ),
-                ),
-            ],
-          ),
         ],
       ),
       body:
@@ -94,7 +111,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
               : Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 🟢 Productos
+                  // 🟢 SECCIÓN PRODUCTOS
                   Expanded(
                     flex: isMobile ? 1 : 3,
                     child: Padding(
@@ -109,96 +126,179 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
                         itemCount: productos.length,
                         itemBuilder: (context, i) {
                           final p = productos[i];
-                          return _buildCardProducto(p, cart, currency);
+                          return _buildCardProducto(context, p, currency);
                         },
                       ),
                     ),
                   ),
 
-                  // 🟣 Carrito lateral (solo escritorio/tablet)
+                  // 🟣 SECCIÓN CARRITO (oculta en pantallas pequeñas)
                   if (!isMobile)
-                    Expanded(
-                      flex: 1,
-                      child: Container(
-                        color: Colors.white,
-                        child: const CartScreen(),
-                      ),
-                    ),
+                    Expanded(flex: 1, child: _buildCarrito(context, currency)),
                 ],
               ),
 
-      // 🟠 FAB flotante para móviles
+      // 🟠 Carrito flotante para móviles
       floatingActionButton:
-          isMobile && cart.items.isNotEmpty
+          isMobile && cart.lines.isNotEmpty
               ? FloatingActionButton.extended(
-                onPressed:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartScreen()),
-                    ),
+                onPressed: () => _mostrarCarritoMovil(context),
                 backgroundColor: Colors.deepPurple,
                 icon: const Icon(Icons.shopping_cart),
-                label: Text('${currency.format(cart.total)}'),
+                label: Text(currency.format(cart.total)),
               )
               : null,
     );
   }
 
-  // 🧃 Tarjeta de producto
+  // 🧃 Tarjeta individual de producto
   Widget _buildCardProducto(
-    Producto p,
-    CartController cart,
+    BuildContext context,
+    Product p,
     NumberFormat currency,
   ) {
-    final enCarrito = cart.items.containsKey(p.idProducto);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.purple.withOpacity(0.1),
-            blurRadius: 6,
-            offset: const Offset(2, 3),
-          ),
-        ],
+    final enCarrito = context.watch<CartController>().lines.any(
+      (line) => line.product.id == p.idProducto,
+    );
+    return GestureDetector(
+      onTap: () => _agregarAlCarrito(context, p),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.purple.withAlpha(25), // Reemplazo de withOpacity
+              blurRadius: 6,
+              offset: const Offset(2, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          children: [
+            Expanded(
+              child:
+                  p.imagen != null && p.imagen!.isNotEmpty
+                      ? Image.network(p.imagen!, fit: BoxFit.contain)
+                      : const Icon(
+                        Icons.image_not_supported,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              p.nombre,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 2,
+            ),
+            Text(
+              currency.format(p.precioVenta),
+              style: const TextStyle(
+                color: Colors.deepPurple,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ElevatedButton.icon(
+              onPressed: () => _agregarAlCarrito(context, p),
+              icon: const Icon(Icons.add_shopping_cart),
+              label: Text(enCarrito ? 'Agregar +' : 'Agregar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 36),
+              ),
+            ),
+          ],
+        ),
       ),
-      padding: const EdgeInsets.all(10),
+    );
+  }
+
+  // 🛒 Panel lateral del carrito
+  Widget _buildCarrito(BuildContext context, NumberFormat currency) {
+    final cart = context.watch<CartController>();
+
+    if (cart.lines.isEmpty) {
+      return const Center(
+        child: Text(
+          '🛍️ Carrito vacío',
+          style: TextStyle(color: Colors.black54),
+        ),
+      );
+    }
+
+    return Container(
+      color: const Color(0xFFFDFBFF),
+      padding: const EdgeInsets.all(12),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text(
+            '🛒 Carrito',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const Divider(),
           Expanded(
-            child:
-                p.imagen != null
-                    ? Image.network(p.imagen!, fit: BoxFit.contain)
-                    : const Icon(
-                      Icons.image_not_supported,
-                      size: 60,
-                      color: Colors.grey,
-                    ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            p.nombre,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-            maxLines: 2,
-          ),
-          Text(
-            currency.format(p.precioVenta),
-            style: const TextStyle(
-              color: Colors.deepPurple,
-              fontWeight: FontWeight.bold,
+            child: ListView.builder(
+              itemCount: cart.lines.length,
+              itemBuilder: (context, i) {
+                final line = cart.lines[i];
+                final p = line.product;
+                return ListTile(
+                  leading:
+                      p.imagen != null && p.imagen!.isNotEmpty
+                          ? Image.network(p.imagen!, width: 40)
+                          : const Icon(Icons.image, color: Colors.grey),
+                  title: Text(p.nombre),
+                  subtitle: Text(currency.format(line.price)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        onPressed: () => cart.decrement(i),
+                      ),
+                      Text('${line.qty.toInt()}'),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline),
+                        onPressed: () => cart.increment(i),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
-          const SizedBox(height: 4),
+          const Divider(),
+          // Aquí podrías agregar Subtotal, IVA y Total si quieres más detalle
+          Text('Subtotal: ${currency.format(cart.itemsSubtotal)}'),
+          Text('IVA (16%): ${currency.format(cart.iva)}'),
+          Text(
+            'Total: ${currency.format(cart.total)}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 8),
           ElevatedButton.icon(
-            onPressed: () => cart.agregar(p),
-            icon: const Icon(Icons.add_shopping_cart),
-            label: Text(enCarrito ? 'Agregar +' : 'Agregar'),
+            onPressed: cart.loading ? null : () => _finalizarVenta(context),
+            icon: const Icon(Icons.check_circle),
+            label:
+                cart.loading
+                    ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : const Text('Finalizar venta'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 36),
+              backgroundColor: Colors.green,
+              minimumSize: const Size(double.infinity, 40),
             ),
           ),
         ],
@@ -207,11 +307,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
   }
 
   // 💬 Carrito emergente en móvil
-  void _mostrarCarritoMovil(
-    BuildContext context,
-    NumberFormat currency,
-    CartController cart,
-  ) {
+  void _mostrarCarritoMovil(BuildContext context) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -220,7 +316,10 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
           (_) => SafeArea(
             child: FractionallySizedBox(
               heightFactor: 0.9,
-              child: CartScreen(), // 👈 ahora usa directamente CartScreen
+              child: _buildCarrito(
+                context,
+                NumberFormat.simpleCurrency(locale: 'es_MX'),
+              ),
             ),
           ),
     );

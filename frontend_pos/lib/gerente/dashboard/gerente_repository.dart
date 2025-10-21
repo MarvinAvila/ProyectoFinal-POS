@@ -1,7 +1,6 @@
 // lib/gerente/dashboard/dashboard_repository.dart
 import 'package:frontend_pos/core/http.dart';
-import 'package:frontend_pos/auth/auth_service.dart';
-import 'package:intl/intl.dart';
+import 'package:frontend_pos/core/env.dart';
 
 /// ---- Modelos ----
 
@@ -114,50 +113,12 @@ class SalesPoint {
 class GerenteDashboardRepository {
   final _api = ApiClient();
 
-  Map<String, String> _authHeaders() {
-    final token = AuthService.token;
-    return {
-      'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  /// 🔹 Resumen del dashboard del GERENTE
-  /// Endpoint esperado: /dashboard/gerente
-  /// Estructura: { data: { estadisticas: {...}, ventas_ultima_semana:[...], top_productos:[...] } }
-  /// 🔹 Resumen del dashboard del GERENTE + Top Productos
+  /// 🔹 Resumen del dashboard del GERENTE.
+  /// Llama al endpoint unificado que devuelve todos los datos necesarios.
   Future<GerenteDashboardData> fetchDashboard() async {
-    // Obtener resumen del dashboard
-    final resumen = await _api.get(
-      '/dashboard/resumen',
-      headers: _authHeaders(),
-    );
-    final ventasDia = await _api.get('/ventas/dia', headers: _authHeaders());
-
-    // Obtener top de productos (nuevo)
-    final top = await _api.get(
-      '/ventas/top-productos',
-      headers: _authHeaders(),
-    );
-
-    // Normalizar estructura del resumen
-    final normalized =
-        (resumen is Map && resumen.containsKey('data'))
-            ? resumen['data']
-            : resumen;
-
-    // Fusionar ambos resultados
-    final merged = {
-      ...Map<String, dynamic>.from(normalized ?? {}),
-      'top_productos':
-          top is Map && top.containsKey('data') ? top['data'] : top,
-      'ventas_hoy':
-          ventasDia is Map && ventasDia.containsKey('data')
-              ? ventasDia['data']
-              : ventasDia,
-    };
-
-    // Construir objeto final
-    return GerenteDashboardData.fromJson(Map<String, dynamic>.from(merged));
+    // ✅ Petición única y simplificada. ApiClient maneja URL y token.
+    // El método _parse de ApiClient ya extrae el contenido de 'data' si existe.
+    final data = await _api.get(Endpoints.dashboardResumen);
+    return GerenteDashboardData.fromJson(asMap(data));
   }
 }
