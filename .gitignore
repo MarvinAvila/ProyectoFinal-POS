@@ -9,6 +9,7 @@ backend-pos/logs/
 backend-pos/*.log
 backend-pos/.nyc_output/
 backend-pos/coverage/
+backend-pos/scripts/
 
 # =============== FRONTEND ===============
 frontend-pos/build/
