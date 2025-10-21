@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+// ✅ Controladores
+import 'package:frontend_pos/empleado/carrito/cart_controller.dart';
 
 // ✅ Pantallas de autenticación
 import 'package:frontend_pos/auth/home_login_screen.dart';
@@ -16,7 +20,15 @@ import 'package:frontend_pos/admin/productos/product_form_screen.dart';
 import 'package:frontend_pos/empleado/ventas/ventas_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        // 🔹 Carrito global disponible en toda la app
+        ChangeNotifierProvider(create: (_) => CartController()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -27,12 +39,14 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'POS Roles App',
       debugShowCheckedModeBanner: false,
+
       // ✅ Pantalla inicial ahora es la selección de rol
       initialRoute: '/',
+
       routes: {
         '/': (context) => const HomeLoginScreen(),
 
-        // ✅ Si quieres entrar directo a login de admin (opcional):
+        // ✅ Logins por rol
         '/login/admin': (context) => const LoginScreen(role: 'admin'),
         '/login/gerente': (context) => const LoginScreen(role: 'gerente'),
         '/cajero/empleado': (context) => const LoginScreen(role: 'empleado'),
@@ -46,6 +60,9 @@ class MyApp extends StatelessWidget {
         // ✅ Módulo de productos (CRUD)
         '/admin/productos': (context) => const ProductsScreen(),
         '/admin/productos/form': (context) => const ProductFormScreen(),
+
+        // ✅ Ventas (si la usas en empleado)
+        '/cajero/ventas': (context) => const VentasScreen(),
       },
     );
   }
