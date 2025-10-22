@@ -3,6 +3,14 @@ class ChatbotService {
     this.knowledgeBase = this.initializeKnowledgeBase();
   }
 
+  normalizeText(text) {
+    return text
+      .toLowerCase()
+      .normalize("NFD") // Separar tildes
+      .replace(/[\u0300-\u036f]/g, "") // Eliminar tildes
+      .trim();
+  }
+
   initializeKnowledgeBase() {
     return {
       // ==================== SALUDOS Y AYUDA GENERAL ====================
@@ -236,6 +244,118 @@ class ChatbotService {
         roles: ["admin", "dueno"], // Solo roles elevados
       },
 
+      // ==================== CREAR USUARIO MEJORADO ====================
+      crear_usuario: {
+        patterns: [
+          "crear usuario",
+          "nuevo empleado",
+          "registrar usuario",
+          "agregar empleado",
+          "como crear usuario",
+          "crear un usuario",
+          "agregar usuario",
+          "registrar empleado",
+          "nuevo usuario",
+          "alta de usuario",
+          "crear cuenta",
+          "nueva cuenta",
+          "dar de alta usuario",
+        ],
+        response:
+          '**Para crear un usuario:**\n\n1. **Ve a "Gestión de Usuarios"** (solo admin/dueno)\n2. **Completa los datos:**\n   • Nombre completo\n   • Correo electrónico\n   • Contraseña temporal\n   • Rol (cajero, gerente, admin)\n3. **El sistema:**\n   • Valida que el correo no exista\n   • Envía credenciales al correo\n   • Requiere cambio de contraseña en primer login\n\n**Roles permitidos para crear usuarios:** Admin y Dueño solamente.',
+        roles: ["admin", "dueno"],
+      },
+
+      // ==================== NUEVAS CATEGORÍAS AVANZADAS ====================
+      productos_populares: {
+        patterns: [
+          "productos más vendidos",
+          "top productos",
+          "qué productos venden más",
+          "productos populares",
+          "más vendidos",
+          "best sellers",
+        ],
+        response:
+          '**Productos más vendidos:**\n\nPuedes ver el top de productos en:\n1. **Dashboard Gerente/Admin** → Sección "Métricas"\n2. **Reportes** → "Top Productos por Ventas"\n3. **Filtra por:**\n   • Fecha específica\n   • Rango de fechas\n   • Categoría de producto\n\nLos datos se actualizan automáticamente con cada venta.',
+        roles: ["admin", "gerente", "dueno"],
+      },
+
+      alertas_sistema: {
+        patterns: [
+          "alertas",
+          "notificaciones",
+          "qué alertas hay",
+          "stock bajo alerta",
+          "productos por caducar",
+          "alertas del sistema",
+          "avisos importantes",
+        ],
+        response:
+          "**🔔 Sistema de Alertas:**\n\n**Tipos de alertas automáticas:**\n• 📦 **Stock bajo**: Productos cerca del mínimo\n• 📅 **Caducidad**: Productos próximos a vencer\n• 💰 **Ventas bajas**: Productos con poca rotación\n• 👥 **Rendimiento**: Métricas de empleados\n\n**Dónde verlas:**\n• Dashboard Admin/Gerente → Sección Alertas\n• Panel principal → Icono de campana\n• Reportes específicos por tipo de alerta",
+        roles: ["admin", "gerente", "dueno"],
+      },
+
+      // ==================== PROCESOS AVANZADOS ====================
+      inventario_detallado: {
+        patterns: [
+          "historial inventario",
+          "movimientos stock",
+          "cambios en inventario",
+          "registro inventario",
+          "tracking stock",
+          "seguimiento inventario",
+        ],
+        response:
+          "**📊 Historial de Inventario:**\n\nEl sistema registra automáticamente:\n\n**Cada movimiento genera registro:**\n• ➕ **Entradas**: Compras, ajustes positivos\n• ➖ **Salidas**: Ventas, ajustes negativos\n• 🔄 **Ajustes**: Correcciones manuales\n\n**Información registrada:**\n• Producto y cantidad\n• Fecha y hora exacta\n• Usuario que realizó la acción\n• Motivo del movimiento\n\n**Acceso:** Gestión de Inventario → Historial",
+        roles: ["admin", "gerente", "dueno"],
+      },
+
+      // ==================== SOLUCIÓN DE PROBLEMAS AVANZADOS ====================
+      problemas_avanzados: {
+        patterns: [
+          "no imprime ticket",
+          "error de impresión",
+          "problema con impresora",
+          "ticket no sale",
+          "falla impresión",
+          "configurar impresora",
+        ],
+        response:
+          "**🖨️ Solución de Problemas de Impresión:**\n\n**Pasos a seguir:**\n1. ✅ Verificar que la impresora esté encendida y con papel\n2. 🔌 Revisar conexión USB/red con el equipo\n3. ⚙️ Comprobar configuración de impresora en el sistema\n4. 🔄 Reiniciar el servicio de impresión\n5. 📋 Probar impresión de ticket de prueba\n\n**Si persiste el problema:**\n• Contactar al administrador del sistema\n• Verificar logs de error en el dashboard\n• Revisar configuración de formato de ticket",
+        roles: ["cajero", "admin", "gerente", "dueno"],
+      },
+
+      // ==================== CONFIGURACIÓN Y MANTENIMIENTO ====================
+      configuracion_sistema: {
+        patterns: [
+          "configurar sistema",
+          "ajustes generales",
+          "configuración pos",
+          "parametros sistema",
+          "opciones configuración",
+          "personalizar sistema",
+        ],
+        response:
+          "**⚙️ Configuración del Sistema:**\n\n**Configuraciones disponibles:**\n• **Empresa**: Nombre, logo, información fiscal\n• **Ventas**: IVA, formas de pago, impuestos\n• **Inventario**: Stock mínimo, alertas automáticas\n• **Seguridad**: Roles, permisos, políticas de contraseñas\n• **Backup**: Copias de seguridad automáticas\n\n**Acceso:** Solo Administrador y Dueño → Menú Configuración",
+        roles: ["admin", "dueno"],
+      },
+
+      // ==================== REPORTES AVANZADOS ====================
+      reportes_avanzados: {
+        patterns: [
+          "reporte financiero",
+          "estadísticas avanzadas",
+          "métricas detalladas",
+          "análisis ventas",
+          "reporte gerencial",
+          "dashboard avanzado",
+        ],
+        response:
+          "**📈 Reportes Avanzados:**\n\n**Reportes disponibles para Gerente/Admin:**\n\n**📊 Ventas y Finanzas:**\n• Tendencia de ventas por período\n• Análisis de margen de ganancia\n• Comparativo mes a mes\n• Rentabilidad por producto/categoría\n\n**👥 Desempeño:**\n• Ventas por empleado\n• Eficiencia por turno/hora\n• Métricas de productividad\n\n**📦 Inventario:**\n• Rotación de productos\n• Análisis ABC de inventario\n• Proyección de reposición\n\n**Acceso:** Dashboard → Reportes Avanzados",
+        roles: ["admin", "gerente", "dueno"],
+      },
+
       // ==================== FALLBACK MEJORADO ====================
       fallback: {
         patterns: [],
@@ -258,7 +378,7 @@ Parece que tu pregunta está fuera del alcance de mi conocimiento actual.
   }
 
   getResponse(userMessage, userRole) {
-    const cleanMessage = userMessage.toLowerCase().trim();
+    const cleanMessage = this.normalizeText(userMessage); // ✅ USAR NORMALIZACIÓN
 
     // Validar rol del usuario
     const rolesValidos = ["cajero", "admin", "gerente", "dueno"];
@@ -273,8 +393,8 @@ Parece que tu pregunta está fuera del alcance de mi conocimiento actual.
     for (const [category, data] of Object.entries(this.knowledgeBase)) {
       if (category === "fallback" || category === "acceso_denegado") continue;
 
-      const matchCount = data.patterns.filter((pattern) =>
-        cleanMessage.includes(pattern)
+      const matchCount = data.patterns.filter(
+        (pattern) => cleanMessage.includes(this.normalizeText(pattern)) // ✅ NORMALIZAR PATRONES TAMBIÉN
       ).length;
 
       if (matchCount > maxMatches) {
@@ -290,7 +410,6 @@ Parece que tu pregunta está fuera del alcance de mi conocimiento actual.
       if (categoryData.roles.includes(userRole)) {
         return categoryData.response;
       } else {
-        // Usuario no tiene permisos para esta categoría
         return this.knowledgeBase.acceso_denegado.response;
       }
     }
