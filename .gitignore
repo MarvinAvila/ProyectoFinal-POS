@@ -10,7 +10,7 @@ backend-pos/.nyc_output/
 backend-pos/coverage/
 backend-pos/scripts/
 
-backend-pos/CHECKLIST_CHATBOT.md # ✅ NUEVO: Ignorar el checklist del chatbot
+backend-pos/CHECKLIST_CHATBOT.md
 # =============== FRONTEND ===============
 frontend-pos/build/
 frontend-pos/.dart_tool/
