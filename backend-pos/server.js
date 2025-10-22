@@ -29,6 +29,7 @@ const ofertaRoutes = require('./src/routes/ofertas');
 const comprobanteRoutes = require('./src/routes/comprobantes');
 const detalleVentaRoutes = require('./src/routes/detalleVenta');
 const productoOfertaRoutes = require('./src/routes/productoOferta');
+const chatbotRoutes = require('./src/routes/chatbot'); // ✅ NUEVO: Importar rutas del chatbot
 
 // Función para verificar la conexión a la base de datos
 async function verificarConexionBD() {
@@ -68,6 +69,7 @@ app.use('/api/ofertas', ofertaRoutes);
 app.use('/api/comprobantes', comprobanteRoutes);
 app.use('/api/detalle-venta', detalleVentaRoutes);
 app.use('/api/producto-oferta', productoOfertaRoutes);
+app.use('/api/chatbot', chatbotRoutes); 
 
 // Ruta de salud mejorada con info de BD
 app.get('/api/health', async (req, res) => {
@@ -120,7 +122,6 @@ app.get('/api/db-info', async (req, res) => {
     }
 });
 
-// ✅ NUEVO: Endpoint para inicializar/reinicializar BD
 app.post('/api/init-db', async (req, res) => {
     try {
         console.log('🔄 Solicitada inicialización de BD...');
