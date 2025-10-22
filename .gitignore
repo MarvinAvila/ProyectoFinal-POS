@@ -45,8 +45,6 @@ Thumbs.db
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-.packages
-pubspec.lock
 
 # Android build files
 android/.gradle/

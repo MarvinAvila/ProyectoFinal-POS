@@ -249,8 +249,25 @@ async create(req, res) {
       unidad: unidad || 'unidad',
       fecha_caducidad: fecha_caducidad || null,
       id_categoria: id_categoria ? QueryBuilder.validateId(id_categoria) : null,
-      id_proveedor: id_proveedor ? QueryBuilder.validateId(id_proveedor) : null
+      id_proveedor: id_proveedor ? QueryBuilder.validateId(id_proveedor) : null,
+      imagen: null // Inicialmente null
     };
+
+    // ✅ PROCESAR IMAGEN SI SE SUBIÓ
+    if (req.file) {
+      const cloudinary = require('../config/cloudinary');
+      const b64 = Buffer.from(req.file.buffer).toString('base64');
+      const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+      
+      const result = await cloudinary.uploader.upload(dataURI, {
+        folder: 'punto_venta',
+        quality: 'auto:good',
+        fetch_format: 'auto'
+      });
+      
+      // ✅ Solo guardamos la URL en la base de datos
+      productoData.imagen = result.secure_url;
+    }
 
     // Validar usando el modelo
     const validationErrors = Producto.validate(productoData);
@@ -262,7 +279,7 @@ async create(req, res) {
     }
 
     // Verificar código de barras único
-    if (codigo_barra) {
+    if (productoData.codigo_barra) {
       const codigoExistente = await client.query(
         'SELECT id_producto FROM productos WHERE codigo_barra = $1',
         [productoData.codigo_barra]
@@ -297,12 +314,12 @@ async create(req, res) {
       }
     }
 
-    // ✅ INSERT sin stock_minimo
+    // ✅ INSERT con soporte para imagen (solo URL)
     const result = await client.query(
       `INSERT INTO productos (
           id_categoria, id_proveedor, nombre, codigo_barra, 
-          precio_compra, precio_venta, stock, unidad, fecha_caducidad
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          precio_compra, precio_venta, stock, unidad, fecha_caducidad, imagen
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *`,
       [
         productoData.id_categoria,
@@ -313,7 +330,8 @@ async create(req, res) {
         productoData.precio_venta,
         productoData.stock,
         productoData.unidad,
-        productoData.fecha_caducidad
+        productoData.fecha_caducidad,
+        productoData.imagen // ✅ Solo la URL de Cloudinary
       ]
     );
 
@@ -325,16 +343,15 @@ async create(req, res) {
       producto_id: nuevoProducto.id_producto,
       nombre: nuevoProducto.nombre,
       precio_venta: nuevoProducto.precio_venta,
-      stock_inicial: nuevoProducto.stock
+      stock_inicial: nuevoProducto.stock,
+      tiene_imagen: !!nuevoProducto.imagen
     });
-    // ✅ Respuesta compatible con Flutter
+
     return res.status(201).json({
       success: true,
       message: "Producto creado exitosamente",
       data: nuevoProducto
     });
-
-    //return responseHelper.success(res, nuevoProducto, "Producto creado exitosamente", 201);
 
   } catch (error) {
     await client.query('ROLLBACK');
@@ -373,7 +390,39 @@ async update(req, res) {
     const productoActual = productoExistente.rows[0];
     const productoData = { ...productoActual };
 
-    // Aplicar updates validados (sin stock_minimo)
+    // ✅ PROCESAR NUEVA IMAGEN SI SE SUBIÓ
+    if (req.file) {
+      const cloudinary = require('../config/cloudinary');
+      
+      // Eliminar imagen anterior de Cloudinary si existe
+      if (productoActual.imagen) {
+        const urlParts = productoActual.imagen.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        const publicId = 'punto_venta/' + fileName.split('.')[0];
+        
+        try {
+          await cloudinary.uploader.destroy(publicId);
+        } catch (deleteError) {
+          console.log('No se pudo eliminar imagen anterior de Cloudinary:', deleteError);
+        }
+      }
+
+      // Subir nueva imagen a Cloudinary
+      const b64 = Buffer.from(req.file.buffer).toString('base64');
+      const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+      
+      const result = await cloudinary.uploader.upload(dataURI, {
+        folder: 'punto_venta',
+        quality: 'auto:good',
+        fetch_format: 'auto'
+      });
+      
+      // ✅ Solo guardamos la nueva URL en la base de datos
+      productoData.imagen = result.secure_url;
+      updates.imagen = result.secure_url;
+    }
+
+    // Aplicar updates validados
     if (updates.nombre !== undefined) productoData.nombre = helpers.sanitizeInput(updates.nombre);
     if (updates.codigo_barra !== undefined) productoData.codigo_barra = updates.codigo_barra;
     if (updates.precio_compra !== undefined) productoData.precio_compra = parseFloat(updates.precio_compra);
@@ -405,13 +454,13 @@ async update(req, res) {
       }
     }
 
-    // Construir query dinámica
+    // Construir query dinámica (incluye soporte para imagen)
     const setClauses = [];
     const values = [];
     let paramIndex = 1;
 
     Object.keys(updates).forEach(field => {
-      if (['nombre', 'codigo_barra', 'unidad', 'fecha_caducidad'].includes(field)) {
+      if (['nombre', 'codigo_barra', 'unidad', 'fecha_caducidad', 'imagen'].includes(field)) {
         setClauses.push(`${field} = $${paramIndex}`);
         values.push(productoData[field]);
         paramIndex++;
@@ -450,15 +499,15 @@ async update(req, res) {
 
     logger.audit("Producto actualizado", req.user?.id_usuario, "UPDATE", {
       producto_id: id,
-      campos_actualizados: Object.keys(updates)
+      campos_actualizados: Object.keys(updates),
+      imagen_actualizada: !!req.file
     });
-      // ✅ Respuesta compatible con Flutter
+
     return res.status(200).json({
       success: true,
       message: "Producto actualizado exitosamente",
       data: productoActualizado
     });
-    //return responseHelper.success(res, productoActualizado, "Producto actualizado exitosamente");
 
   } catch (error) {
     await client.query('ROLLBACK');

@@ -289,7 +289,7 @@ const ventaController = {
       await transaction.query('COMMIT');
 
       // Obtener venta completa con detalles
-      const ventaCompleta = await this.obtenerVentaCompleta(idVenta);
+      const ventaCompleta = await ventaController.obtenerVentaCompleta(idVenta);
 
       logger.audit('Venta creada', usuarioId, 'CREATE', {
         venta_id: idVenta,
