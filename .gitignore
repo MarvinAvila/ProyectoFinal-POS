@@ -1,5 +1,4 @@
 # Desde la raíz del proyecto (ProyectoFinal)
-@'
 # =============== BACKEND ===============
 backend-pos/node_modules/
 backend-pos/.env
@@ -9,10 +8,12 @@ backend-pos/logs/
 backend-pos/*.log
 backend-pos/.nyc_output/
 backend-pos/coverage/
+backend-pos/scripts/
 
 # =============== FRONTEND ===============
 frontend-pos/build/
 frontend-pos/.dart_tool/
+frontend-pos/lib/scripts/
 frontend-pos/.pub-cache/
 frontend-pos/.pub/
 frontend-pos/.flutter-plugins

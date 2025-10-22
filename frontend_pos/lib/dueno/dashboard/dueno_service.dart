@@ -1,31 +1,20 @@
-// lib/dueno/services/dueno_service.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+// lib/dueno/services/dueno_service.dart CORREGIDO
+import 'package:frontend_pos/core/http.dart';
+import 'package:frontend_pos/core/env.dart';
 
 class DuenoService {
-  // Rutas base (mismo patrón que GerenteService)
-  static const String _authBase = 'http://192.168.1.67:3000/api/auth';
-  static const String _dashboardBase = 'http://192.168.1.67:3000/api/dashboard';
+  static final _api = ApiClient();
 
-  /// 🔑 LOGIN DUEÑO (mismo formato que GerenteService.login)
-  static Future<Map<String, dynamic>> login(
-    String email,
-    String password,
-  ) async {
-    final response = await http.post(
-      Uri.parse('$_authBase/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'correo': email, 'contrasena': password}),
-    );
+  /// 🔑 LOGIN DUEÑO
+  static Future<Map<String, dynamic>> login(String email, String password) async {
+    try {
+      final data = await _api.post(
+        Endpoints.authLogin,
+        data: {'correo': email, 'contrasena': password},
+      );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-
-      if (data['success'] == true && data['token'] != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', data['token']);
-
+      if (data['token'] != null) {
+        await ApiClient.setToken(data['token']);
         return {'success': true, 'token': data['token']};
       } else {
         return {
@@ -33,42 +22,21 @@ class DuenoService {
           'message': data['message'] ?? 'Credenciales inválidas',
         };
       }
-    } else {
+    } catch (e) {
       return {
         'success': false,
-        'message': 'Error en el servidor (${response.statusCode})',
+        'message': 'Error en el servidor: $e',
       };
     }
   }
 
   /// 📊 DASHBOARD DEL DUEÑO
-  /// Consulta /api/dashboard/dueno con el token guardado
-  static Future<Map<String, dynamic>> fetchSummary([String? token]) async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedToken = token ?? prefs.getString('token');
-
-    if (savedToken == null || savedToken.isEmpty) {
-      throw Exception('Token no encontrado');
-    }
-
-    final response = await http.get(
-      Uri.parse('$_dashboardBase/dueno'),
-      headers: {'Authorization': 'Bearer $savedToken'},
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-
-      if (data['success'] == true) {
-        // Devuelve directamente los datos útiles del dashboard
-        return Map<String, dynamic>.from(data['data'] ?? {});
-      } else {
-        throw Exception(
-          data['message'] ?? 'Error al obtener el resumen del dueño',
-        );
-      }
-    } else {
-      throw Exception('Error en el servidor (${response.statusCode})');
+  static Future<Map<String, dynamic>> fetchSummary() async {
+    try {
+      final data = await _api.get(Endpoints.dashboardResumen);
+      return data; // ✅ Devuelve los datos directamente
+    } catch (e) {
+      throw Exception('Error al obtener resumen del dueño: $e');
     }
   }
 }

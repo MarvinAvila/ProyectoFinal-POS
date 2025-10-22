@@ -17,6 +17,7 @@ class GerenteDashboard extends StatefulWidget {
 class _GerenteDashboardScreenState extends State<GerenteDashboard> {
   final repo = GerenteDashboardRepository();
   late Future<GerenteDashboardData> dashboardFuture;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -25,7 +26,23 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
   }
 
   Future<void> _loadDashboard() async {
-    setState(() => dashboardFuture = repo.fetchDashboard());
+    try {
+      setState(() => _isLoading = true);
+
+      // Primero obtenemos los datos
+      final data = await repo.fetchDashboard();
+
+      // Luego actualizamos el estado
+      setState(() {
+        dashboardFuture = Future.value(data);
+        _isLoading = false;
+      });
+    } catch (error) {
+      setState(() {
+        _isLoading = false;
+      });
+      print('Error loading dashboard: $error');
+    }
   }
 
   @override
@@ -53,7 +70,7 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
                   duration: Duration(seconds: 2),
                 ),
               );
-              Navigator.pushReplacementNamed(context, '/gerente/login');
+              Navigator.pushReplacementNamed(context, '/login/gerente');
             },
           ),
         ],

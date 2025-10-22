@@ -1,28 +1,42 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+// lib/empleado/services/empleado_service.dart CORREGIDO
+import 'package:frontend_pos/core/http.dart';
+import 'package:frontend_pos/core/env.dart';
 
 class EmpleadoService {
-  static const baseUrl = 'http://localhost:3000/api/empleado';
+  static final _api = ApiClient();
 
-  static Future<Map<String, dynamic>> login(
-    String email,
-    String password,
-  ) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/login'),
-      body: {'email': email, 'password': password},
-    );
-    return json.decode(response.body);
+  /// 🔑 LOGIN EMPLEADO
+  static Future<Map<String, dynamic>> login(String email, String password) async {
+    try {
+      final data = await _api.post(
+        Endpoints.authLogin,
+        data: {'correo': email, 'contrasena': password},
+      );
+
+      if (data['token'] != null) {
+        await ApiClient.setToken(data['token']);
+        return {'success': true, 'token': data['token']};
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Credenciales inválidas',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error en el servidor: $e',
+      };
+    }
   }
 
-  static Future<Map<String, dynamic>> fetchSummary(String token) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/resumen'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-
-    final data = json.decode(response.body);
-    if (data['success']) return data['resumen'];
-    throw Exception('Error al obtener resumen del empleado');
+  /// 📊 RESUMEN EMPLEADO
+  static Future<Map<String, dynamic>> fetchSummary() async {
+    try {
+      final data = await _api.get(Endpoints.dashboardResumen);
+      return data;
+    } catch (e) {
+      throw Exception('Error al obtener resumen del empleado: $e');
+    }
   }
 }

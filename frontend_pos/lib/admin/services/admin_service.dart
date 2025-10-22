@@ -1,32 +1,24 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+// lib/admin/services/admin_service.dart CORREGIDO
+import 'package:frontend_pos/core/http.dart';
+import 'package:frontend_pos/core/env.dart';
 
 class AdminService {
-  static const String baseUrl = 'http://192.168.1.67:3000/api/auth';
+  static final _api = ApiClient();
 
   /// 🔑 LOGIN ADMIN
-  static Future<Map<String, dynamic>> login(
-    String email,
-    String password,
-  ) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'correo': email, // 👈 Ajusta al nombre que espera tu backend
-        'contrasena': password, // 👈 Ajusta al nombre que espera tu backend
-      }),
-    );
+  static Future<Map<String, dynamic>> login(String email, String password) async {
+    try {
+      final data = await _api.post(
+        Endpoints.authLogin,
+        data: {
+          'correo': email,
+          'contrasena': password,
+        },
+      );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-
-      if (data['success'] == true && data['token'] != null) {
-        // Guardar token en SharedPreferences para posteriores peticiones
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', data['token']);
-
+      // ✅ ApiClient.setToken guarda automáticamente el token
+      if (data['token'] != null) {
+        await ApiClient.setToken(data['token']);
         return {'success': true, 'token': data['token']};
       } else {
         return {
@@ -34,41 +26,21 @@ class AdminService {
           'message': data['message'] ?? 'Credenciales inválidas',
         };
       }
-    } else {
+    } catch (e) {
       return {
         'success': false,
-        'message': 'Error en el servidor (${response.statusCode})',
+        'message': 'Error en el servidor: $e',
       };
     }
   }
 
   /// 📊 RESUMEN ADMIN
-  static Future<Map<String, dynamic>> fetchSummary([String? token]) async {
-    // Si no se pasa token, lo obtenemos de SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    final savedToken = token ?? prefs.getString('token');
-
-    if (savedToken == null || savedToken.isEmpty) {
-      throw Exception('Token no encontrado');
-    }
-
-    final response = await http.get(
-      Uri.parse('$baseUrl/resumen'),
-      headers: {'Authorization': 'Bearer $savedToken'},
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-
-      if (data['success']) {
-        return data['resumen'];
-      } else {
-        throw Exception(
-          data['message'] ?? 'Error al obtener resumen del administrador',
-        );
-      }
-    } else {
-      throw Exception('Error en el servidor (${response.statusCode})');
+  static Future<Map<String, dynamic>> fetchSummary() async {
+    try {
+      final data = await _api.get(Endpoints.dashboardResumen);
+      return data; // ✅ ApiClient ya extrae 'data' si existe
+    } catch (e) {
+      throw Exception('Error al obtener resumen: $e');
     }
   }
 }
