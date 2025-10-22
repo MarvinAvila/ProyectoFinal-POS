@@ -9,25 +9,46 @@ class UsersRepository {
   final _api = ApiClient();
 
   /// 🟣 Listar usuarios (GET /usuarios)
-  Future<List<Usuario>> fetchUsers() async {
-    final data = await _api.get(Endpoints.usuarios);
+ Future<List<Usuario>> fetchUsers() async {
+  final data = await _api.get(Endpoints.usuarios);
 
-    List list;
-    // Adaptarse a diferentes formatos de respuesta del backend
-    if (data is Map && data['data'] is List) {
+  // DEBUG - Agrega esto temporalmente
+  print('🔍 [DEBUG UsersRepository] Tipo de data: ${data.runtimeType}');
+  print('🔍 [DEBUG UsersRepository] Contenido: $data');
+
+  List list;
+  
+  // ✅ CORREGIDO - Ahora data ya viene procesado por _parse()
+  if (data is List) {
+    list = data;
+  } else if (data is Map) {
+    // Si el backend devuelve un Map con la lista en alguna key
+    if (data['usuarios'] is List) {
+      list = data['usuarios'];
+    } else if (data['data'] is List) {
       list = data['data'];
-    } else if (data is Map && data['data'] is Map && data['data']['usuarios'] is List) {
-      list = data['data']['usuarios'];
-    } else if (data is List) {
-      list = data;
+    } else if (data['items'] is List) {
+      list = data['items'];
     } else {
-      throw Exception('Formato de respuesta no reconocido para usuarios');
+      // Buscar cualquier key que sea una lista
+      final possibleListKey = data.keys.firstWhere(
+        (key) => data[key] is List,
+        orElse: () => '',
+      );
+      if (possibleListKey.isNotEmpty) {
+        list = data[possibleListKey];
+      } else {
+        throw Exception('Formato de respuesta no reconocido: $data');
+      }
     }
-
-    return list
-        .map((e) => Usuario.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
+  } else {
+    throw Exception('Formato de respuesta no reconocido: $data');
   }
+
+  return list
+      .map((e) => Usuario.fromJson(Map<String, dynamic>.from(e)))
+      .toList();
+}
 
   /// 🟢 Crear usuario (POST /usuarios)
   Future<Usuario> createUser(Usuario user, String contrasena) async {

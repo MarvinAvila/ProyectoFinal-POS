@@ -57,6 +57,8 @@ class _LoginScreenState extends State<LoginScreen>
 
  Future<void> iniciarSesion() async {
   print('🔄 [LoginScreen] Iniciando sesión...');
+  
+  // ✅ Solo un setState al inicio
   setState(() {
     cargando = true;
     error = null;
@@ -71,7 +73,6 @@ class _LoginScreenState extends State<LoginScreen>
     print('✅ [LoginScreen] Respuesta recibida: $resultado');
     print('✅ [LoginScreen] Keys: ${resultado.keys.toList()}');
 
-    // ✅ CORREGIDO: Acceder directamente a las claves, sin ['data']
     final usuario = resultado['usuario'];
     final token = resultado['token'];
 
@@ -87,30 +88,40 @@ class _LoginScreenState extends State<LoginScreen>
       await storage.write(key: 'rol', value: usuario['rol']);
       
       print('➡️ [LoginScreen] Navegando a /${widget.role}/dashboard');
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/${widget.role}/dashboard');
-      print('✅ [LoginScreen] Navegación completada');
+      
+      // ✅ Navegación SEGURA - sin setState
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/${widget.role}/dashboard');
+        print('✅ [LoginScreen] Navegación completada');
+      }
     } else {
       print('❌ [LoginScreen] ERROR: Rol no coincide');
       print('❌ [LoginScreen] Esperado: ${widget.role}, Recibido: ${usuario['rol']}');
-      setState(() {
-        error = 'Rol incorrecto: este usuario no pertenece a ${widget.role.toUpperCase()}';
-      });
-      _shakeCtrl.forward(from: 0);
+      
+      // ✅ Solo un setState para el error
+      if (mounted) {
+        setState(() {
+          error = 'Rol incorrecto: este usuario no pertenece a ${widget.role.toUpperCase()}';
+          cargando = false;
+        });
+        _shakeCtrl.forward(from: 0);
+      }
     }
   } catch (e) {
     print('❌ [LoginScreen] ERROR: $e');
-    print('❌ [LoginScreen] Stack trace: ${e.toString()}');
-    setState(() {
-      error = 'Error al conectar con el servidor: ${e.toString()}';
-    });
-    _shakeCtrl.forward(from: 0);
-  } finally {
+    
+    // ✅ Manejo seguro de errores
     if (mounted) {
-      setState(() => cargando = false);
-      print('🏁 [LoginScreen] Proceso finalizado');
+      setState(() {
+        error = 'Error al conectar con el servidor: ${e.toString()}';
+        cargando = false;
+      });
+      _shakeCtrl.forward(from: 0);
     }
   }
+  
+  // ❌ ELIMINADO el finally con setState - ya se maneja en cada caso
+  print('🏁 [LoginScreen] Proceso finalizado');
 }
 
   @override

@@ -46,10 +46,11 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => const HomeLoginScreen(),
 
-        // ✅ Logins por rol
+        // ✅ Logins por rol (ACTUALIZADOS Y COMPLETOS)
         '/login/admin': (context) => const LoginScreen(role: 'admin'),
         '/login/gerente': (context) => const LoginScreen(role: 'gerente'),
-        '/cajero/empleado': (context) => const LoginScreen(role: 'empleado'),
+        '/login/dueno': (context) => const LoginScreen(role: 'dueno'), // ✅ AÑADIDO
+        '/login/cajero': (context) => const LoginScreen(role: 'cajero'), // ✅ CORREGIDO
 
         // ✅ Dashboards
         '/admin/dashboard': (context) => const AdminDashboardScreen(),

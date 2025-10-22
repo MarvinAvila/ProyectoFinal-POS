@@ -20,6 +20,7 @@ class DuenoDashboard extends StatefulWidget {
 class _DuenoDashboardState extends State<DuenoDashboard> {
   final repo = DuenoDashboardRepository();
   late Future<DuenoDashboardData> dashboardFuture;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -28,9 +29,24 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
   }
 
   Future<void> _loadDashboard() async {
-    setState(() => dashboardFuture = repo.fetchDashboard());
+    try {
+      setState(() => _isLoading = true);
+      
+      // Primero obtenemos los datos
+      final data = await repo.fetchDashboard();
+      
+      // Luego actualizamos el estado
+      setState(() {
+        dashboardFuture = Future.value(data);
+        _isLoading = false;
+      });
+    } catch (error) {
+      setState(() {
+        _isLoading = false;
+      });
+      print('Error loading dashboard: $error');
+    }
   }
-
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 700;
@@ -56,7 +72,7 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
                   duration: Duration(seconds: 2),
                 ),
               );
-              Navigator.pushReplacementNamed(context, '/dueno/login');
+              Navigator.pushReplacementNamed(context, '/login/dueno');
             },
           ),
         ],
