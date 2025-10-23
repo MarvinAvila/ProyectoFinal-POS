@@ -32,19 +32,13 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
   Future<void> _loadDashboard() async {
     try {
       setState(() => _isLoading = true);
-
-      // Primero obtenemos los datos
       final data = await repo.fetchDashboard();
-
-      // Luego actualizamos el estado
       setState(() {
         dashboardFuture = Future.value(data);
         _isLoading = false;
       });
     } catch (error) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       print('Error loading dashboard: $error');
     }
   }
@@ -108,75 +102,79 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
                   _buildWelcomePanel(context, isMobile),
                   const SizedBox(height: 24),
 
-                  // 🟪 TARJETAS PRINCIPALES DEL DUEÑO
-                  GridView.count(
-                    crossAxisCount: isMobile ? 1 : 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      _buildCard(
-                        title: 'Ingresos Totales',
-                        value: currency.format(data.ingresosTotales),
-                        icon: Icons.account_balance_wallet_outlined,
-                        color1: const Color(0xFFFFD6E8),
-                        color2: const Color(0xFFE1BEE7),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const VentasScreen(),
-                            ),
-                          ).then((_) => _loadDashboard());
-                        },
-                      ),
-                      _buildCard(
-                        title: 'IVA Recaudado',
-                        value: currency.format(data.ivaRecaudado),
-                        icon: Icons.receipt_long_outlined,
-                        color1: const Color(0xFFC8E6C9),
-                        color2: const Color(0xFFA5D6A7),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const IvaRecaudadoScreen(),
-                            ),
-                          ).then((_) => _loadDashboard());
-                        },
-                      ),
-                      _buildCard(
-                        title: 'Promedio de Venta',
-                        value: currency.format(data.promedioVenta),
-                        icon: Icons.trending_up,
-                        color1: const Color(0xFFB3E5FC),
-                        color2: const Color(0xFF81D4FA),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const PromedioVentaScreen(),
-                            ),
-                          ).then((_) => _loadDashboard());
-                        },
-                      ),
-                      _buildCard(
-                        title: 'Alertas Activas',
-                        value: '${data.alertasActivas}',
-                        icon: Icons.warning_amber_rounded,
-                        color1: const Color(0xFFFFF59D),
-                        color2: const Color(0xFFFFCC80),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const AlertsScreen(),
-                            ),
-                          ).then((_) => _loadDashboard());
-                        },
-                      ),
-                    ],
+                  // 🟦 MENÚ HORIZONTAL DEL DUEÑO (sustituye las tarjetas)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8, bottom: 20),
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF311B92),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.deepPurple.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      children: [
+                        _buildTopButton(
+                          context,
+                          icon: Icons.receipt_long_outlined,
+                          label: 'Ventas',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const VentasScreen(),
+                              ),
+                            ).then((_) => _loadDashboard());
+                          },
+                        ),
+                        _buildTopButton(
+                          context,
+                          icon: Icons.account_balance_wallet_outlined,
+                          label: 'IVA',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const IvaRecaudadoScreen(),
+                              ),
+                            ).then((_) => _loadDashboard());
+                          },
+                        ),
+                        _buildTopButton(
+                          context,
+                          icon: Icons.trending_up,
+                          label: 'Promedio',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PromedioVentaScreen(),
+                              ),
+                            ).then((_) => _loadDashboard());
+                          },
+                        ),
+                        _buildTopButton(
+                          context,
+                          icon: Icons.warning_amber_rounded,
+                          label: 'Alertas',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AlertsScreen(),
+                              ),
+                            ).then((_) => _loadDashboard());
+                          },
+                        ),
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 24),
@@ -238,11 +236,7 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            builder:
-                (_) => const SizedBox(
-                  height: 600,
-                  child: ChatbotScreen(), // ✅ Chatbot modal
-                ),
+            builder: (_) => const SizedBox(height: 600, child: ChatbotScreen()),
           );
         },
       ),
@@ -309,55 +303,39 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
     );
   }
 
-  // 🧱 TARJETA REUTILIZABLE
-  Widget _buildCard({
-    required String title,
-    required String value,
+  // 🔹 Botón del menú horizontal
+  Widget _buildTopButton(
+    BuildContext context, {
     required IconData icon,
-    required Color color1,
-    required Color color2,
+    required String label,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color1, color2],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: color2.withOpacity(0.4),
-              blurRadius: 10,
-              offset: const Offset(3, 6),
+              color: Colors.purple.shade100.withOpacity(0.3),
+              blurRadius: 6,
+              offset: const Offset(2, 3),
             ),
           ],
         ),
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Icon(icon, size: 38, color: const Color(0xFF4A148C)),
-            const SizedBox(height: 10),
+            Icon(icon, color: const Color(0xFF4A148C), size: 22),
+            const SizedBox(width: 8),
             Text(
-              title,
+              label,
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
                 color: Color(0xFF4A148C),
-              ),
-            ),
-            const Spacer(),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF311B92),
+                fontSize: 15,
               ),
             ),
           ],
