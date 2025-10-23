@@ -88,6 +88,26 @@ class Producto {
 
   // Métodos estáticos
   static fromDatabaseRow(row) {
+    // ✅ CORRECCIÓN: Manejo seguro de codigos_public_ids
+    let codigosPublicIds = null;
+
+    if (row.codigos_public_ids) {
+      if (typeof row.codigos_public_ids === "string") {
+        try {
+          codigosPublicIds = JSON.parse(row.codigos_public_ids);
+        } catch (e) {
+          console.warn(
+            "⚠️ codigos_public_ids no es JSON válido, usando como string:",
+            e.message
+          );
+          codigosPublicIds = row.codigos_public_ids;
+        }
+      } else {
+        // Ya es objeto (puede pasar en algunos entornos)
+        codigosPublicIds = row.codigos_public_ids;
+      }
+    }
+
     return new Producto(
       row.id_producto,
       row.nombre,
@@ -102,7 +122,7 @@ class Producto {
       row.imagen,
       row.codigo_barras_url,
       row.codigo_qr_url,
-      row.codigos_public_ids ? JSON.parse(row.codigos_public_ids) : null
+      codigosPublicIds
     );
   }
 
