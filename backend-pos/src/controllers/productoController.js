@@ -61,7 +61,7 @@ const productoController = {
       }
 
       if (con_stock_minimo === "true") {
-        whereConditions.push(`p.stock <= p.stock_minimo`);
+        whereConditions.push(`p.stock <= 5`);
       }
 
       if (por_caducar === "true") {
@@ -117,18 +117,18 @@ const productoController = {
         const productoModel = new Producto(
           producto.id_producto,
           producto.nombre,
-          producto.descripcion,
           producto.codigo_barra,
           producto.precio_compra,
           producto.precio_venta,
           producto.stock,
-          producto.stock_minimo,
           producto.unidad,
-          producto.id_categoria,
-          producto.id_proveedor,
           producto.fecha_caducidad,
-          producto.activo,
-          producto.fecha_creacion
+          producto.id_proveedor,
+          producto.id_categoria,
+          producto.imagen,
+          producto.codigo_barras_url,
+          producto.codigo_qr_url,
+          producto.codigos_public_ids
         );
 
         return {
@@ -209,18 +209,18 @@ const productoController = {
       const productoModel = new Producto(
         producto.id_producto,
         producto.nombre,
-        producto.descripcion,
         producto.codigo_barra,
         producto.precio_compra,
         producto.precio_venta,
         producto.stock,
-        producto.stock_minimo,
         producto.unidad,
-        producto.id_categoria,
-        producto.id_proveedor,
         producto.fecha_caducidad,
-        producto.activo,
-        producto.fecha_creacion
+        producto.id_proveedor,
+        producto.id_categoria,
+        producto.imagen,
+        producto.codigo_barras_url,
+        producto.codigo_qr_url,
+        producto.codigos_public_ids
       );
 
       // Información enriquecida
@@ -744,7 +744,7 @@ const productoController = {
       const stats = await client.query(`
                 SELECT 
                     COUNT(*) as total_productos,
-                    SUM(CASE WHEN stock <= stock_minimo THEN 1 ELSE 0 END) as productos_bajo_stock,
+                    SUM(CASE WHEN stock <= 5 THEN 1 ELSE 0 END) as productos_bajo_stock,
                     SUM(CASE WHEN fecha_caducidad IS NOT NULL AND fecha_caducidad <= CURRENT_DATE + INTERVAL '30 days' THEN 1 ELSE 0 END) as productos_por_caducar,
                     AVG(precio_venta - precio_compra) as ganancia_promedio,
                     SUM(stock * precio_compra) as valor_inventario
