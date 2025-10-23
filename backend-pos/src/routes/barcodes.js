@@ -7,7 +7,7 @@ const auth = require('../middleware/auth');
 const { validationResult } = require('express-validator');
 
 // Aplicar autenticación a todas las rutas
-router.use(auth.authenticate);
+router.use(auth.verifyToken);
 
 // ===== RUTAS DE CÓDIGOS INDIVIDUALES =====
 

@@ -1,5 +1,5 @@
 // middleware/validation/barcodeValidations.js
-const { body, param, query } = require('express-validator');
+const { body, param, query, validationResult } = require('express-validator'); 
 const responseHelper = require('../../utils/responseHelper');
 
 const barcodeValidations = {
@@ -70,7 +70,7 @@ const barcodeValidations = {
 
   // Middleware para manejar errores de validación
   handleValidationErrors: (req, res, next) => {
-    const errors = validationResult(req);
+    const errors = validationResult(req); // ← AHORA validationResult está definido
     if (!errors.isEmpty()) {
       return responseHelper.error(res, 'Errores de validación', 400, {
         errors: errors.array()
