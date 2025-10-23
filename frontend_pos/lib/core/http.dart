@@ -29,8 +29,8 @@ class ApiClient {
         baseUrl: Env.apiRoot,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 20),
-        // No lances excepción automática para 4xx; nosotros la mapeamos
-        validateStatus: (code) => code != null && code < 500,
+        // ✅ CORREGIDO: Permitir todos los códigos de estado
+        validateStatus: (status) => status != null && status < 600,
         headers: {'Content-Type': 'application/json'},
       ),
     );
@@ -41,6 +41,11 @@ class ApiClient {
           final token = await _storage.read(key: _kTokenKey);
           if (token != null && token.isNotEmpty) {
             o.headers['Authorization'] = 'Bearer $token';
+          }
+          if (kDebugMode) {
+            debugPrint(
+              '[API ${o.method}] ${o.uri}',
+            );
           }
           return h.next(o);
         },
@@ -56,6 +61,9 @@ class ApiClient {
         onError: (e, h) {
           if (kDebugMode) {
             debugPrint('[API ERROR] ${e.requestOptions.uri}: ${e.message}');
+            if (e.response != null) {
+              debugPrint('[API ERROR DATA] ${e.response?.data}');
+            }
           }
           return h.next(e);
         },
@@ -83,29 +91,52 @@ class ApiClient {
   Future<dynamic> get(
     String path, {
     Map<String, dynamic>? query,
-    Map<String, dynamic>? headers, // ✅ ahora acepta headers
+    Map<String, dynamic>? headers,
   }) async {
-    final res = await _dio.get(
-      path,
-      queryParameters: query,
-      options: Options(headers: headers),
-    );
-    return _parse(res);
+    try {
+      final res = await _dio.get(
+        path,
+        queryParameters: query,
+        options: Options(headers: headers),
+      );
+      return _parse(res);
+    } on DioException catch (e) {
+      // ✅ Manejo mejorado de errores de Dio
+      if (e.response != null) {
+        return _parse(e.response!);
+      }
+      throw ApiError(
+        status: e.response?.statusCode,
+        message: e.message ?? 'Error de conexión',
+        data: e.response?.data,
+      );
+    }
   }
 
   Future<dynamic> post(
     String path, {
     Object? data,
     Map<String, dynamic>? query,
-    Map<String, dynamic>? headers, // ✅ headers opcionales
+    Map<String, dynamic>? headers,
   }) async {
-    final res = await _dio.post(
-      path,
-      data: data,
-      queryParameters: query,
-      options: Options(headers: headers),
-    );
-    return _parse(res);
+    try {
+      final res = await _dio.post(
+        path,
+        data: data,
+        queryParameters: query,
+        options: Options(headers: headers),
+      );
+      return _parse(res);
+    } on DioException catch (e) {
+      if (e.response != null) {
+        return _parse(e.response!);
+      }
+      throw ApiError(
+        status: e.response?.statusCode,
+        message: e.message ?? 'Error de conexión',
+        data: e.response?.data,
+      );
+    }
   }
 
   Future<dynamic> put(
@@ -114,13 +145,24 @@ class ApiClient {
     Map<String, dynamic>? query,
     Map<String, dynamic>? headers,
   }) async {
-    final res = await _dio.put(
-      path,
-      data: data,
-      queryParameters: query,
-      options: Options(headers: headers),
-    );
-    return _parse(res);
+    try {
+      final res = await _dio.put(
+        path,
+        data: data,
+        queryParameters: query,
+        options: Options(headers: headers),
+      );
+      return _parse(res);
+    } on DioException catch (e) {
+      if (e.response != null) {
+        return _parse(e.response!);
+      }
+      throw ApiError(
+        status: e.response?.statusCode,
+        message: e.message ?? 'Error de conexión',
+        data: e.response?.data,
+      );
+    }
   }
 
   Future<dynamic> delete(
@@ -129,27 +171,47 @@ class ApiClient {
     Map<String, dynamic>? query,
     Map<String, dynamic>? headers,
   }) async {
-    final res = await _dio.delete(
-      path,
-      data: data,
-      queryParameters: query,
-      options: Options(headers: headers),
-    );
-    return _parse(res);
+    try {
+      final res = await _dio.delete(
+        path,
+        data: data,
+        queryParameters: query,
+        options: Options(headers: headers),
+      );
+      return _parse(res);
+    } on DioException catch (e) {
+      if (e.response != null) {
+        return _parse(e.response!);
+      }
+      throw ApiError(
+        status: e.response?.statusCode,
+        message: e.message ?? 'Error de conexión',
+        data: e.response?.data,
+      );
+    }
   }
 
-  /// Normaliza respuestas:
-  /// - 2xx: devuelve `res.data` o `res.data['data']` si existe.
-  /// - 4xx: lanza ApiError con mensaje si viene {message|error}
+  /// ✅ CORREGIDO: Manejo mejorado de respuestas
   dynamic _parse(Response res) {
     final status = res.statusCode ?? 500;
     final body = res.data;
 
+    // Si es éxito (2xx), devolver datos
     if (status >= 200 && status < 300) {
       if (body is Map && body.containsKey('data')) return body['data'];
       return body;
     }
 
+    // Si es error del servidor (5xx), manejar apropiadamente
+    if (status >= 500) {
+      throw ApiError(
+        status: status,
+        message: 'Error del servidor: $status',
+        data: body,
+      );
+    }
+
+    // Si es error del cliente (4xx)
     String message = 'Error $status';
     if (body is Map) {
       message = (body['message'] ?? body['error'] ?? message).toString();

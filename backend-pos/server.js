@@ -112,7 +112,7 @@ app.get("/api/health", async (req, res) => {
 // Ruta adicional para información detallada de BD
 app.get("/api/db-info", async (req, res) => {
   try {
-    const [dbInfo, tablas] = await Promise.all([
+    const [dbInfo, tablas, columnas] = await Promise.all([
       db.query(
         "SELECT current_database() as name, current_user as user, version() as version"
       ),
@@ -122,13 +122,48 @@ app.get("/api/db-info", async (req, res) => {
                 WHERE table_schema = 'public'
                 ORDER BY table_name
             `),
+      // ✅ NUEVO: Consulta para obtener la estructura de todas las columnas
+      db.query(`
+                SELECT 
+                    table_name, 
+                    column_name, 
+                    data_type, 
+                    is_nullable, 
+                    column_default,
+                    character_maximum_length,
+                    udt_name
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                ORDER BY table_name, ordinal_position
+            `),
     ]);
+
+    // ✅ NUEVO: Agrupar columnas por tabla
+    const columnasPorTabla = columnas.rows.reduce((acc, col) => {
+      if (!acc[col.table_name]) {
+        acc[col.table_name] = [];
+      }
+      acc[col.table_name].push({
+        name: col.column_name,
+        type: col.data_type,
+        is_nullable: col.is_nullable === "YES",
+        default: col.column_default,
+        max_length: col.character_maximum_length,
+      });
+      return acc;
+    }, {});
+
+    // ✅ NUEVO: Combinar tablas con su estructura
+    const tablasConEstructura = tablas.rows.map((tabla) => ({
+      ...tabla,
+      columns: columnasPorTabla[tabla.table_name] || [],
+    }));
 
     res.json({
       success: true,
       database: dbInfo.rows[0],
-      tables: tablas.rows,
-      total_tables: tablas.rows.length,
+      tables: tablasConEstructura,
+      total_tables: tablasConEstructura.length,
     });
   } catch (error) {
     res.status(500).json({
