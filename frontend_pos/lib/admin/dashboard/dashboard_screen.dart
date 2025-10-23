@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'dashboard_repository.dart';
 import 'package:frontend_pos/admin/usuarios/users_screen.dart';
+import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart'; // 💬 agregado
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -129,9 +130,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             MaterialPageRoute(
                               builder: (_) => const VentasScreen(),
                             ),
-                          ).then(
-                            (_) => _loadDashboard(),
-                          ); // ✅ se actualiza al volver
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                       _buildCard(
@@ -146,9 +145,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             MaterialPageRoute(
                               builder: (_) => const ProductsScreen(),
                             ),
-                          ).then(
-                            (_) => _loadDashboard(),
-                          ); // ✅ se actualiza al volver
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                       _buildCard(
@@ -163,7 +160,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             MaterialPageRoute(
                               builder: (_) => const CategoriesScreen(),
                             ),
-                          ).then((_) => _loadDashboard()); // ✅
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                       _buildCard(
@@ -178,9 +175,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             MaterialPageRoute(
                               builder: (_) => const ProveedoresScreen(),
                             ),
-                          ).then(
-                            (_) => _loadDashboard(),
-                          ); // ✅ actualiza al volver
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                       _buildCard(
@@ -195,7 +190,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             MaterialPageRoute(
                               builder: (_) => const UsersScreen(),
                             ),
-                          ).then((_) => _loadDashboard()); // ✅
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                       _buildCard(
@@ -210,7 +205,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             MaterialPageRoute(
                               builder: (_) => const AlertsScreen(),
                             ),
-                          ).then((_) => _loadDashboard()); // ✅
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                     ],
@@ -218,6 +213,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ],
               ),
             ),
+          );
+        },
+      ),
+
+      // 💬 Chatbot flotante — agregado sin afectar la lógica
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'chatbot_button_admin',
+        backgroundColor: const Color(0xFF6A1B9A),
+        elevation: 6,
+        child: const Icon(Icons.chat, color: Colors.white),
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.white,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder:
+                (_) => const SizedBox(
+                  height: 600,
+                  child: ChatbotScreen(), // ✅ Usa token del usuario actual
+                ),
           );
         },
       ),

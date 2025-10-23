@@ -6,6 +6,7 @@ import 'gerente_repository.dart';
 import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
 import 'package:frontend_pos/alertas/alerts_screen.dart';
 import 'package:frontend_pos/gerente/ventas/top_productos_screen.dart';
+import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart'; // 💬 agregado
 
 class GerenteDashboard extends StatefulWidget {
   const GerenteDashboard({super.key});
@@ -104,7 +105,7 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
                   _buildWelcomePanel(context, isMobile),
                   const SizedBox(height: 24),
 
-                  // 🟩 TARJETAS PRINCIPALES (patrón admin)
+                  // 🟩 TARJETAS PRINCIPALES
                   GridView.count(
                     crossAxisCount: isMobile ? 1 : 2,
                     mainAxisSpacing: 16,
@@ -122,9 +123,7 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder:
-                                  (context) =>
-                                      const VentasDiaScreen(), // 👈 Reutiliza la del admin
+                              builder: (_) => const VentasDiaScreen(),
                             ),
                           ).then((_) => _loadDashboard());
                         },
@@ -139,14 +138,11 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder:
-                                  (context) =>
-                                      const VentasScreen(), // 👈 Reutiliza la del admin
+                              builder: (_) => const VentasScreen(),
                             ),
                           ).then((_) => _loadDashboard());
                         },
                       ),
-
                       _buildCard(
                         title: 'Top Productos',
                         value: '${data.topProductos.length}',
@@ -159,7 +155,7 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
                             MaterialPageRoute(
                               builder: (_) => const TopProductosScreen(),
                             ),
-                          ).then((_) => _loadDashboard()); // ✅
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                       _buildCard(
@@ -174,7 +170,7 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
                             MaterialPageRoute(
                               builder: (_) => const AlertsScreen(),
                             ),
-                          ).then((_) => _loadDashboard()); // ✅
+                          ).then((_) => _loadDashboard());
                         },
                       ),
                     ],
@@ -185,10 +181,33 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
           );
         },
       ),
+
+      // 💬 Chatbot flotante — agregado sin afectar la lógica
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'chatbot_button_gerente',
+        backgroundColor: Colors.teal, // color distinto al admin
+        elevation: 6,
+        child: const Icon(Icons.chat, color: Colors.white),
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.white,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder:
+                (_) => const SizedBox(
+                  height: 600,
+                  child: ChatbotScreen(), // ✅ usa token actual del gerente
+                ),
+          );
+        },
+      ),
     );
   }
 
-  // 🌟 PANEL DE BIENVENIDA (igual estilo)
+  // 🌟 PANEL DE BIENVENIDA
   Widget _buildWelcomePanel(BuildContext context, bool isMobile) {
     return Container(
       width: double.infinity,
@@ -248,7 +267,7 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
     );
   }
 
-  // 🧱 TARJETA REUTILIZABLE (mismo widget que admin)
+  // 🧱 TARJETA REUTILIZABLE
   Widget _buildCard({
     required String title,
     required String value,
