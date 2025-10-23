@@ -1,12 +1,19 @@
+// REEMPLAZA SOLO LAS PARTES NECESARIAS EN TU AddProductScreen
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'package:dio/dio.dart';
-import 'product_model.dart'; // ✅ Importar el modelo
-import 'product_repository.dart'; // ✅ Importar el repositorio
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'product_model.dart';
+import 'product_repository.dart';
+import '../../utils/image_picker_utils.dart';
 
 class AddProductScreen extends StatefulWidget {
-  final Product? product; // 👈 producto opcional para editar o crear
+  final Product? product;
 
   const AddProductScreen({super.key, this.product});
 
@@ -16,22 +23,26 @@ class AddProductScreen extends StatefulWidget {
 
 class _AddProductScreenState extends State<AddProductScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _repo = ProductRepository(); // ✅ Usar el repositorio
+  final _repo = ProductRepository();
   final _codigoCtrl = TextEditingController();
   final _nombreCtrl = TextEditingController();
-  final _precioCompraCtrl = TextEditingController(); // 🆕 Nuevo campo
+  final _precioCompraCtrl = TextEditingController();
   final _precioCtrl = TextEditingController();
   final _stockCtrl = TextEditingController();
   final _categoriaCtrl = TextEditingController();
 
-  String? _unidadSeleccionada; // 🆕 Dropdown de unidad
+  String? _unidadSeleccionada;
   bool _loading = false;
+
+  // 🆕 CAMBIO: Reemplazar File por Uint8List para multiplataforma
+  Uint8List? _imageBytes;
+  String? _networkImageUrl;
+  String? _selectedFileName; // 🆕 Guardar nombre del archivo
 
   @override
   void initState() {
     super.initState();
 
-    // 🟣 Si viene un producto, precarga los datos (modo edición)
     final p = widget.product;
     if (p != null) {
       _codigoCtrl.text = p.codigoBarra;
@@ -41,10 +52,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _stockCtrl.text = p.stock.toString();
       _unidadSeleccionada = p.unidad;
       _categoriaCtrl.text = p.idCategoria?.toString() ?? '';
+      _networkImageUrl = p.imagen;
     }
   }
 
-  // 📷 Escanear código de barras o escribirlo manual
+  // 📷 Escanear código de barras (MANTENER IGUAL)
   Future<void> _scanBarcode() async {
     try {
       final barcode = await FlutterBarcodeScanner.scanBarcode(
@@ -61,12 +73,33 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  // 💾 Guardar producto con manejo de errores personalizado
+  // 🖼️ 🆕 ACTUALIZADO: Seleccionar imagen MULTIPLATAFORMA
+  Future<void> _pickImage() async {
+    try {
+      final pickedFile = await ImagePickerUtils.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await ImagePickerUtils.fileToBytes(pickedFile);
+        if (bytes != null) {
+          setState(() {
+            _imageBytes = bytes;
+            _selectedFileName = pickedFile.name; // 🆕 Guardar nombre
+          });
+        }
+      }
+    } catch (e) {
+      _showError('Error al seleccionar imagen: $e');
+    }
+  }
+
+  // 💾 🆕 ACTUALIZADO: Guardar producto MULTIPLATAFORMA
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
-    // ✅ Crear instancia del modelo desde el formulario
     final producto = Product(
       idProducto: widget.product?.idProducto ?? 0,
       codigoBarra: _codigoCtrl.text.trim(),
@@ -75,23 +108,35 @@ class _AddProductScreenState extends State<AddProductScreen> {
       precioVenta: double.tryParse(_precioCtrl.text) ?? 0,
       stock: double.tryParse(_stockCtrl.text) ?? 0,
       unidad: _unidadSeleccionada ?? 'pieza',
-      idCategoria: int.tryParse(_categoriaCtrl.text), // ⚠️ Ajusta según tu lógica real
+      idCategoria: int.tryParse(_categoriaCtrl.text),
       idProveedor: null,
       fechaCaducidad: null,
     );
 
     try {
       final bool isEdit = widget.product != null;
+
+      // 🆕 LLAMADA MULTIPLATAFORMA MEJORADA
       if (isEdit) {
-        await _repo.update(producto);
+        await _repo.update(
+          producto,
+          imageFile:
+              !kIsWeb && _imageBytes != null ? await _createTempFile() : null,
+          imageBytes: kIsWeb ? _imageBytes : null,
+          imageFileName: _selectedFileName,
+        );
       } else {
-        await _repo.create(producto);
+        await _repo.create(
+          producto,
+          imageFile:
+              !kIsWeb && _imageBytes != null ? await _createTempFile() : null,
+          imageBytes: kIsWeb ? _imageBytes : null,
+          imageFileName: _selectedFileName,
+        );
       }
 
       if (!mounted) return;
-      _showSuccess(
-        isEdit ? 'Producto actualizado' : 'Producto agregado',
-      );
+      _showSuccess(isEdit ? 'Producto actualizado' : 'Producto agregado');
       Navigator.pop(context, true);
     } on ApiError catch (e) {
       String msg;
@@ -117,6 +162,91 @@ class _AddProductScreenState extends State<AddProductScreen> {
       setState(() => _loading = false);
     }
   }
+
+  // 🆕 AGREGAR este método auxiliar para móvil
+  Future<File?> _createTempFile() async {
+    if (_imageBytes == null || _selectedFileName == null) return null;
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/$_selectedFileName');
+      await tempFile.writeAsBytes(_imageBytes!);
+      return tempFile;
+    } catch (e) {
+      print('Error creando archivo temporal: $e');
+      return null;
+    }
+  }
+
+  // 🆕 ACTUALIZADO: Widget de imagen MULTIPLATAFORMA
+  Widget _buildImagePicker() {
+    return Center(
+      child: Stack(
+        children: [
+          Container(
+            width: 130,
+            height: 130,
+            decoration: BoxDecoration(
+              border: Border.all(width: 2, color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child:
+                  _imageBytes != null
+                      ? Image.memory(
+                        _imageBytes!,
+                        fit: BoxFit.cover,
+                      ) // 🆕 Image.memory para bytes
+                      : (_networkImageUrl != null &&
+                          _networkImageUrl!.isNotEmpty)
+                      ? Image.network(
+                        _networkImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder:
+                            (context, error, stackTrace) => const Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                              size: 50,
+                            ),
+                      )
+                      : const Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: Colors.grey,
+                          size: 50,
+                        ),
+                      ),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Material(
+              color: const Color(0xFF6A1B9A),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+              child: InkWell(
+                onTap: _pickImage,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(6.0),
+                  child: Icon(Icons.edit, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔽 MANTENER TODOS LOS MÉTODOS EXISTENTES SIN CAMBIOS 🔽
 
   void _showError(String msg) {
     if (!mounted) return;
@@ -160,6 +290,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildImagePicker(), // 🆕 Este método ya fue actualizado
+              const SizedBox(height: 24),
+
               // 🟣 Código de barras
               TextFormField(
                 controller: _codigoCtrl,
