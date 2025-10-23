@@ -5,6 +5,7 @@ import 'package:frontend_pos/admin/productos/product_model.dart';
 import 'package:frontend_pos/admin/productos/product_repository.dart';
 import 'package:frontend_pos/empleado/carrito/cart_controller.dart';
 import 'package:frontend_pos/core/http.dart';
+import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart'; // 💬 Chatbot importado
 
 class EmpleadoDashboardScreen extends StatefulWidget {
   const EmpleadoDashboardScreen({super.key});
@@ -138,16 +139,50 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
                 ],
               ),
 
-      // 🟠 Carrito flotante para móviles
-      floatingActionButton:
-          isMobile && cart.lines.isNotEmpty
-              ? FloatingActionButton.extended(
+      // 💬 Chatbot flotante + 🟠 Carrito flotante móvil
+      floatingActionButton: Stack(
+        children: [
+          if (isMobile && cart.lines.isNotEmpty)
+            Positioned(
+              bottom: 80,
+              right: 16,
+              child: FloatingActionButton.extended(
                 onPressed: () => _mostrarCarritoMovil(context),
                 backgroundColor: Colors.deepPurple,
                 icon: const Icon(Icons.shopping_cart),
                 label: Text(currency.format(cart.total)),
-              )
-              : null,
+              ),
+            ),
+          Positioned(
+            bottom: 16,
+            left: 24,
+            child: FloatingActionButton(
+              heroTag: 'chatbot_empleado',
+              backgroundColor: Colors.deepPurple,
+              tooltip: 'Abrir Chatbot',
+              elevation: 6,
+              child: const Icon(Icons.chat, color: Colors.white),
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder:
+                      (_) => const SizedBox(
+                        height: 600,
+                        child: ChatbotScreen(), // ✅ Chatbot modal
+                      ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 

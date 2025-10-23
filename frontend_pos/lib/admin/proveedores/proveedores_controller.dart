@@ -11,26 +11,39 @@ class ProveedoresController extends ChangeNotifier {
   String? error;
 
   /// 🔹 Obtener todos los proveedores
+  /// 🔹 Obtener todos los proveedores
   Future<void> fetchAll() async {
     loading = true;
     notifyListeners();
 
     try {
-      // ✅ Petición simplificada. ApiClient maneja URL y token.
-      final data = await _api.get(Endpoints.proveedores);
-      if (data is List) {
-        final list = data;
-        proveedores =
-            list
-                .map((e) => Proveedor.fromJson(Map<String, dynamic>.from(e)))
-                .toList();
-      } else {
-        proveedores = [];
+      final response = await _api.get(Endpoints.proveedores);
+
+      // 🟣 Manejamos ambos posibles formatos
+      dynamic proveedoresRaw;
+
+      if (response is Map) {
+        if (response['proveedores'] is List) {
+          // Caso 1: el cliente HTTP ya devuelve directamente { proveedores: [...] }
+          proveedoresRaw = response['proveedores'];
+        } else if (response['data'] is Map &&
+            response['data']['proveedores'] is List) {
+          // Caso 2: backend devuelve { data: { proveedores: [...] } }
+          proveedoresRaw = response['data']['proveedores'];
+        }
       }
+
+      // ✅ Convertir a lista de objetos Proveedor
+      proveedores =
+          (proveedoresRaw as List<dynamic>? ?? [])
+              .map((e) => Proveedor.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
 
       error = null;
     } on ApiError catch (e) {
       error = 'Error al cargar proveedores: $e';
+    } catch (e) {
+      error = 'Error inesperado: $e';
     } finally {
       loading = false;
       notifyListeners();
@@ -53,8 +66,10 @@ class ProveedoresController extends ChangeNotifier {
   /// 🔹 Actualizar proveedor
   Future<bool> updateProveedor(Proveedor proveedor) async {
     try {
-      await _api.put('${Endpoints.proveedores}/${proveedor.idProveedor}',
-          data: proveedor.toJson());
+      await _api.put(
+        '${Endpoints.proveedores}/${proveedor.idProveedor}',
+        data: proveedor.toJson(),
+      );
       await fetchAll();
       return true;
     } on ApiError catch (e) {
