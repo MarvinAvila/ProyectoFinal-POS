@@ -1,11 +1,11 @@
-const db = require('./database');
+const db = require("./database");
 
 async function inicializarBaseDeDatos() {
-    try {
-        console.log('🔄 Inicializando base de datos...');
+  try {
+    console.log("🔄 Inicializando base de datos...");
 
-        // Ejecutar tu script SQL completo
-        const sqlScript = `
+    // Ejecutar tu script SQL completo
+    const sqlScript = `
             -- =====================================
             -- TABLA: Usuarios (autenticación)
             -- =====================================
@@ -43,22 +43,30 @@ async function inicializarBaseDeDatos() {
                 descripcion TEXT
             );
 
-            -- =====================================
-            -- TABLA: Productos
-            -- =====================================
-            CREATE TABLE IF NOT EXISTS productos (
-                id_producto SERIAL PRIMARY KEY,
-                nombre VARCHAR(200) NOT NULL,
-                codigo_barra VARCHAR(50) UNIQUE NOT NULL,
-                precio_compra NUMERIC(10,2) NOT NULL,
-                precio_venta NUMERIC(10,2) NOT NULL,
-                stock NUMERIC(10,2) NOT NULL DEFAULT 0,
-                unidad VARCHAR(50) NOT NULL CHECK (unidad IN ('pieza','kg','lt','otro')),
-                fecha_caducidad DATE,
-                id_proveedor INT REFERENCES proveedores(id_proveedor) ON DELETE SET NULL,
-                id_categoria INT REFERENCES categorias(id_categoria) ON DELETE SET NULL,
-                imagen TEXT
-            );
+           -- =====================================
+           -- TABLA: Productos (ACTUALIZADA)
+           -- =====================================
+           CREATE TABLE IF NOT EXISTS productos (
+               id_producto SERIAL PRIMARY KEY,
+               nombre VARCHAR(200) NOT NULL,
+               codigo_barra VARCHAR(50) UNIQUE NOT NULL,
+               precio_compra NUMERIC(10,2) NOT NULL,
+               precio_venta NUMERIC(10,2) NOT NULL,
+               stock NUMERIC(10,2) NOT NULL DEFAULT 0,
+               unidad VARCHAR(50) NOT NULL CHECK (unidad IN ('pieza','kg','lt','otro')),
+               fecha_caducidad DATE,
+               id_proveedor INT REFERENCES proveedores(id_proveedor) ON DELETE SET NULL,
+               id_categoria INT REFERENCES categorias(id_categoria) ON DELETE SET NULL,
+               imagen TEXT,
+               -- 🆕 NUEVOS CAMPOS PARA CÓDIGOS
+               codigo_barras_url VARCHAR(500),
+               codigo_qr_url VARCHAR(500),
+               codigos_public_ids JSONB,
+               -- 🆕 CAMPOS DE ESTADO Y AUDITORÍA
+               activo BOOLEAN DEFAULT TRUE,
+               fecha_creacion TIMESTAMP DEFAULT NOW(),
+               fecha_actualizacion TIMESTAMP DEFAULT NOW()
+           );
 
             -- =====================================
             -- TABLA: Ventas
@@ -153,24 +161,23 @@ async function inicializarBaseDeDatos() {
             );
         `;
 
-        // Ejecutar el script completo
-        await db.query(sqlScript);
-        
-        console.log('✅ Base de datos inicializada correctamente');
-        return { success: true, message: 'Base de datos inicializada' };
-        
-    } catch (error) {
-        console.error('❌ Error inicializando base de datos:', error);
-        throw error;
-    }
+    // Ejecutar el script completo
+    await db.query(sqlScript);
+
+    console.log("✅ Base de datos inicializada correctamente");
+    return { success: true, message: "Base de datos inicializada" };
+  } catch (error) {
+    console.error("❌ Error inicializando base de datos:", error);
+    throw error;
+  }
 }
 
 // Función para crear triggers (separado porque algunos entornos los bloquean)
 async function crearTriggers() {
-    try {
-        console.log('🔄 Creando triggers...');
-        
-        const triggerScript = `
+  try {
+    console.log("🔄 Creando triggers...");
+
+    const triggerScript = `
             -- Función que descuenta stock al registrar un detalle de venta
             CREATE OR REPLACE FUNCTION descontar_stock()
             RETURNS TRIGGER AS $$
@@ -214,15 +221,52 @@ async function crearTriggers() {
             EXECUTE FUNCTION generar_alerta_stock();
         `;
 
-        await db.query(triggerScript);
-        console.log('✅ Triggers creados correctamente');
-        
-    } catch (error) {
-        console.warn('⚠️  No se pudieron crear los triggers (puede ser normal en algunos entornos):', error.message);
-    }
+    await db.query(triggerScript);
+    console.log("✅ Triggers creados correctamente");
+  } catch (error) {
+    console.warn(
+      "⚠️  No se pudieron crear los triggers (puede ser normal en algunos entornos):",
+      error.message
+    );
+  }
 }
 
+async function actualizarEstructuraProductos() {
+  try {
+    console.log("🔄 Actualizando estructura de productos...");
+
+    const updateScript = `
+            -- Agregar campos si no existen (para entornos existentes)
+            ALTER TABLE productos 
+            ADD COLUMN IF NOT EXISTS codigo_barras_url VARCHAR(500),
+            ADD COLUMN IF NOT EXISTS codigo_qr_url VARCHAR(500),
+            ADD COLUMN IF NOT EXISTS codigos_public_ids JSONB,
+            ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMP DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS fecha_actualizacion TIMESTAMP DEFAULT NOW();
+
+            -- Actualizar productos existentes
+            UPDATE productos 
+            SET activo = TRUE,
+                fecha_creacion = COALESCE(fecha_creacion, NOW()),
+                fecha_actualizacion = NOW()
+            WHERE activo IS NULL OR fecha_creacion IS NULL;
+
+            -- Crear índices para mejor rendimiento
+            CREATE INDEX IF NOT EXISTS idx_productos_activo ON productos(activo);
+            CREATE INDEX IF NOT EXISTS idx_productos_codigo_barra ON productos(codigo_barra);
+            CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(id_categoria);
+            CREATE INDEX IF NOT EXISTS idx_productos_stock ON productos(stock);
+        `;
+
+    await db.query(updateScript);
+    console.log("✅ Estructura de productos actualizada correctamente");
+  } catch (error) {
+    console.warn("⚠️  Advertencia al actualizar estructura:", error.message);
+  }
+}
 module.exports = {
-    inicializarBaseDeDatos,
-    crearTriggers
+  inicializarBaseDeDatos,
+  crearTriggers,
+  actualizarEstructuraProductos,
 };

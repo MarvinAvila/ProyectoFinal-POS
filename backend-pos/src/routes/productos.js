@@ -13,6 +13,19 @@ router.get("/", productoController.getAll);
 // GET /productos/stats - Obtener estadísticas de productos
 router.get("/stats", productoController.getStats);
 
+// GET /productos/:id/codes - Obtener códigos de un producto
+router.get(
+  "/:id/codes",
+  productoController.getProductCodes
+);
+
+// POST /productos/:id/regenerate-codes - Regenerar códigos
+router.post(
+  "/:id/regenerate-codes",
+  authMiddleware.requireRole(["admin", "dueno"]),
+  productoController.regenerateCodes
+);
+
 // GET /productos/:id - Obtener producto por ID
 router.get("/:id", productoController.getById);
 
@@ -20,16 +33,16 @@ router.get("/:id", productoController.getById);
 router.post(
   "/",
   authMiddleware.requireRole(["admin", "dueno"]),
-  upload.single("imagen"), // ✅ Middleware de upload para imágenes
-  productoController.create // ✅ Tu función create actualizada
+  upload.single("imagen"),
+  productoController.create
 );
 
 // PUT /productos/:id - Actualizar producto completo
 router.put(
   "/:id",
   authMiddleware.requireRole(["admin", "dueno"]),
-  upload.single("imagen"), // ✅ Middleware de upload para imágenes
-  productoController.update // ✅ Tu función update actualizada
+  upload.single("imagen"),
+  productoController.update
 );
 
 // DELETE /productos/:id - Eliminar producto

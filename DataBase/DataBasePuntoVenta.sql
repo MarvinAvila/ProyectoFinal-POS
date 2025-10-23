@@ -222,7 +222,53 @@ EXECUTE FUNCTION set_fecha_actualizacion();
 
 
 
+-- =====================================
+-- 🆕 ACTUALIZACIÓN: Campos para códigos QR y Barras
+-- =====================================
 
+-- Agregar nuevos campos a la tabla productos
+ALTER TABLE productos 
+ADD COLUMN IF NOT EXISTS codigo_barras_url VARCHAR(500),
+ADD COLUMN IF NOT EXISTS codigo_qr_url VARCHAR(500),
+ADD COLUMN IF NOT EXISTS codigos_public_ids JSONB,
+ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMP DEFAULT NOW(),
+ADD COLUMN IF NOT EXISTS fecha_actualizacion TIMESTAMP DEFAULT NOW();
+
+-- Actualizar fechas para productos existentes si es necesario
+UPDATE productos 
+SET fecha_creacion = NOW(), 
+    fecha_actualizacion = NOW(),
+    activo = TRUE
+WHERE fecha_creacion IS NULL;
+
+-- =====================================
+-- 🆕 TRIGGER: Actualización automática de fecha_actualizacion
+-- =====================================
+CREATE OR REPLACE FUNCTION set_fecha_actualizacion()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.fecha_actualizacion := NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Eliminar trigger existente si existe
+DROP TRIGGER IF EXISTS trg_set_fecha_actualizacion ON productos;
+
+-- Crear trigger
+CREATE TRIGGER trg_set_fecha_actualizacion
+BEFORE UPDATE ON productos
+FOR EACH ROW
+EXECUTE FUNCTION set_fecha_actualizacion();
+
+-- =====================================
+-- 🆕 ÍNDICES para mejor rendimiento
+-- =====================================
+CREATE INDEX IF NOT EXISTS idx_productos_activo ON productos(activo);
+CREATE INDEX IF NOT EXISTS idx_productos_codigo_barra ON productos(codigo_barra);
+CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(id_categoria);
+CREATE INDEX IF NOT EXISTS idx_productos_stock ON productos(stock);
 
 
 
