@@ -11,6 +11,7 @@ backend-pos/coverage/
 backend-pos/scripts/
 
 backend-pos/CHECKLIST_CHATBOT.md
+backend-pos/CHECKLIST_BARCODES_QR.md
 # =============== FRONTEND ===============
 frontend-pos/build/
 frontend-pos/.dart_tool/
