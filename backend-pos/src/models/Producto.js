@@ -74,6 +74,13 @@ class Producto {
     );
   }
 
+  esRentable() {
+    if (this.precio_compra <= 0) {
+      return this.precio_venta > 0;
+    }
+    return this.precio_venta > this.precio_compra;
+  }
+
   tieneCodigosGenerados() {
     return !!(this.codigo_barras_url && this.codigo_qr_url);
   }
@@ -85,6 +92,9 @@ class Producto {
       public_ids: this.codigos_public_ids,
     };
   }
+
+  // ✅ NUEVO: Definir unidades como una constante estática
+  static UNIDADES_PERMITIDAS = ["pieza", "kg", "lt", "unidad", "otro"];
 
   // Métodos estáticos
   static fromDatabaseRow(row) {
@@ -149,10 +159,9 @@ class Producto {
       errors.push("El stock no puede ser negativo");
     }
 
-    const unidadesPermitidas = ["pieza", "kg", "lt", "otro"];
-    if (!unidadesPermitidas.includes(productoData.unidad)) {
+    if (productoData.unidad && !Producto.UNIDADES_PERMITIDAS.includes(productoData.unidad)) {
       errors.push(
-        `Unidad no válida. Permitidas: ${unidadesPermitidas.join(", ")}`
+        `Unidad no válida. Permitidas: ${Producto.UNIDADES_PERMITIDAS.join(", ")}`
       );
     }
 

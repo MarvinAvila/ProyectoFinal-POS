@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import 'product_repository.dart';
 import 'product_model.dart';
 import '../../empleado/carrito/cart_controller.dart';
-import 'package:frontend_pos/core/widgets.dart'; // AppLoader, EmptyView
-import 'add_product_screen.dart'; // 👈 importa tu pantalla para agregar productos
+import 'package:frontend_pos/core/widgets.dart';
+import 'add_product_screen.dart'; 
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -216,46 +216,90 @@ class _ProductsScreenState extends State<ProductsScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _ProductAvatar(product: p, size: 48),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      p.nombre,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF4A148C),
+        return SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 🆕 IMAGEN PRINCIPAL DEL PRODUCTO
+                if (p.imagen != null && p.imagen!.isNotEmpty)
+                  Center(
+                    child: Container(
+                      width: 200,
+                      height: 200,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.network(
+                          p.imagen!,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (context, error, stackTrace) => const Icon(
+                                Icons.image_not_supported,
+                                size: 50,
+                              ),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Center(
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD1C4E9),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.inventory_2_outlined,
+                        size: 50,
+                        color: Color(0xFF4A148C),
                       ),
                     ),
                   ),
-                  Text(
-                    currency.format(p.precioVenta),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF6A1B9A),
-                      fontSize: 16,
+
+                const SizedBox(height: 16),
+
+                // 🆕 INFORMACIÓN PRINCIPAL
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        p.nombre,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF4A148C),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _InfoRow(label: 'Código de barras', value: p.codigoBarra),
-              _InfoRow(label: 'Unidad', value: p.unidad),
-              _InfoRow(label: 'Stock', value: p.stock.toStringAsFixed(2)),
-              if (p.fechaCaducidad != null)
-                _InfoRow(
-                  label: 'Caducidad',
-                  value: DateFormat('yyyy-MM-dd').format(p.fechaCaducidad!),
+                    Text(
+                      currency.format(p.precioVenta),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF6A1B9A),
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
                 ),
-              const SizedBox(height: 8),
-            ],
+
+                const SizedBox(height: 16),
+
+                // 🆕 CÓDIGO DE BARRAS VISUAL
+                _BarcodeSection(product: p),
+
+                const SizedBox(height: 16),
+
+                // 🆕 INFORMACIÓN DETALLADA
+                _InfoSection(product: p, currency: currency),
+              ],
+            ),
           ),
         );
       },
@@ -302,10 +346,11 @@ class _ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔹 Encabezado
+            // 🔹 Encabezado - ACTUALIZADO para mostrar imagen
             Row(
               children: [
-                _ProductAvatar(product: product),
+                // 🆕 MOSTRAR IMAGEN DEL PRODUCTO en lugar del avatar
+                _ProductImage(product: product, size: 48),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -463,6 +508,336 @@ class _ProductCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// 🆕 WIDGET PARA MOSTRAR IMAGEN DEL PRODUCTO (en lista)
+class _ProductImage extends StatelessWidget {
+  final Product product;
+  final double size;
+
+  const _ProductImage({required this.product, this.size = 40});
+
+  @override
+  Widget build(BuildContext context) {
+    // Si tiene imagen desde Cloudinary, mostrarla
+    if (product.imagen != null && product.imagen!.isNotEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.network(
+            product.imagen!,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  value:
+                      loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                ),
+              );
+            },
+            errorBuilder:
+                (context, error, stackTrace) =>
+                    _ProductAvatar(product: product, size: size),
+          ),
+        ),
+      );
+    }
+
+    // Si no tiene imagen, mostrar avatar con inicial
+    return _ProductAvatar(product: product, size: size);
+  }
+}
+
+// 🆕 WIDGET PARA SECCIÓN DE CÓDIGOS (con URLs reales de Cloudinary)
+class _BarcodeSection extends StatelessWidget {
+  final Product product;
+
+  const _BarcodeSection({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Códigos del Producto',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF4A148C),
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 📷 IMAGEN DEL CÓDIGO DE BARRAS (desde Cloudinary)
+        if (product.codigoBarrasUrl != null &&
+            product.codigoBarrasUrl!.isNotEmpty)
+          Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Código de Barras:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade400),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Image.network(
+                          product.codigoBarrasUrl!,
+                          width: 200,
+                          height: 80,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              width: 200,
+                              height: 80,
+                              alignment: Alignment.center,
+                              child: CircularProgressIndicator(
+                                value:
+                                    loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress
+                                                .cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                        : null,
+                              ),
+                            );
+                          },
+                          errorBuilder:
+                              (context, error, stackTrace) => Column(
+                                children: [
+                                  const Icon(
+                                    Icons.barcode_reader,
+                                    size: 40,
+                                    color: Colors.grey,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Error cargando código de barras',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Texto numérico del código de barras
+                    Center(
+                      child: Text(
+                        product.codigoBarra,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF4A148C),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+
+        // 🔳 CÓDIGO QR (desde Cloudinary)
+        if (product.codigoQrUrl != null && product.codigoQrUrl!.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Código QR:',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Image.network(
+                      product.codigoQrUrl!,
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          width: 120,
+                          height: 120,
+                          alignment: Alignment.center,
+                          child: CircularProgressIndicator(
+                            value:
+                                loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                          ),
+                        );
+                      },
+                      errorBuilder:
+                          (context, error, stackTrace) => Column(
+                            children: [
+                              const Icon(
+                                Icons.qr_code_2,
+                                size: 60,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Error cargando QR',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (product.codigoBarrasUrl == null)
+          // Mensaje si no hay códigos generados
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: const Column(
+              children: [
+                Icon(Icons.qr_code_2, size: 40, color: Colors.grey),
+                SizedBox(height: 8),
+                Text(
+                  'Códigos no generados',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Los códigos se generan automáticamente al crear el producto',
+                  style: TextStyle(color: Colors.grey, fontSize: 10),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// 🆕 WIDGET PARA INFORMACIÓN DETALLADA
+class _InfoSection extends StatelessWidget {
+  final Product product;
+  final NumberFormat currency;
+
+  const _InfoSection({required this.product, required this.currency});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Información del Producto',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF4A148C),
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Column(
+            children: [
+              _InfoRow(
+                label: 'Precio de compra',
+                value: currency.format(product.precioCompra),
+              ),
+              _InfoRow(label: 'Unidad', value: product.unidad),
+              _InfoRow(label: 'Stock', value: product.stock.toStringAsFixed(2)),
+              if (product.idCategoria != null)
+                _InfoRow(
+                  label: 'Categoría ID',
+                  value: product.idCategoria.toString(),
+                ),
+              if (product.idProveedor != null)
+                _InfoRow(
+                  label: 'Proveedor ID',
+                  value: product.idProveedor.toString(),
+                ),
+              if (product.fechaCaducidad != null)
+                _InfoRow(
+                  label: 'Fecha de caducidad',
+                  value: DateFormat(
+                    'yyyy-MM-dd',
+                  ).format(product.fechaCaducidad!),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

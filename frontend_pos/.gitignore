@@ -45,3 +45,6 @@ app.*.map.json
 /android/app/release
 
 package-lock.json
+
+# Archivos de seguimiento de proyecto
+CHECKLIST.md

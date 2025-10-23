@@ -10,45 +10,16 @@ class UsersRepository {
 
   /// 🟣 Listar usuarios (GET /usuarios)
  Future<List<Usuario>> fetchUsers() async {
-  final data = await _api.get(Endpoints.usuarios);
-
-  // DEBUG - Agrega esto temporalmente
-  print('🔍 [DEBUG UsersRepository] Tipo de data: ${data.runtimeType}');
-  print('🔍 [DEBUG UsersRepository] Contenido: $data');
-
-  List list;
-  
-  // ✅ CORREGIDO - Ahora data ya viene procesado por _parse()
-  if (data is List) {
-    list = data;
-  } else if (data is Map) {
-    // Si el backend devuelve un Map con la lista en alguna key
-    if (data['usuarios'] is List) {
-      list = data['usuarios'];
-    } else if (data['data'] is List) {
-      list = data['data'];
-    } else if (data['items'] is List) {
-      list = data['items'];
-    } else {
-      // Buscar cualquier key que sea una lista
-      final possibleListKey = data.keys.firstWhere(
-        (key) => data[key] is List,
-        orElse: () => '',
-      );
-      if (possibleListKey.isNotEmpty) {
-        list = data[possibleListKey];
-      } else {
-        throw Exception('Formato de respuesta no reconocido: $data');
-      }
-    }
-  } else {
-    throw Exception('Formato de respuesta no reconocido: $data');
+    // Asumimos que el backend devuelve un objeto como: { "usuarios": [...] }
+    // Usamos `asMap` y `asList` de `core/http.dart` para un parseo seguro.
+    final response = await _api.get(Endpoints.usuarios);
+    final dataMap = asMap(response);
+    final userList = asList(dataMap['usuarios']);
+    
+    return userList
+        .map((userData) => Usuario.fromJson(asMap(userData)))
+        .toList();
   }
-
-  return list
-      .map((e) => Usuario.fromJson(Map<String, dynamic>.from(e)))
-      .toList();
-}
 
   /// 🟢 Crear usuario (POST /usuarios)
   Future<Usuario> createUser(Usuario user, String contrasena) async {
@@ -58,17 +29,23 @@ class UsersRepository {
     };
 
     final data = await _api.post(Endpoints.usuarios, data: payload);
-    final m = (data is Map && data['data'] != null) ? asMap(data['data']) : asMap(data);
-    return Usuario.fromJson(m);
+    // El backend devuelve { success: true, message: "...", data: {...} }
+    // Extraemos el objeto de usuario de la clave 'data'.
+    final dataMap = asMap(data);
+    return Usuario.fromJson(asMap(dataMap['data']));
   }
 
   /// 🟡 Actualizar usuario (PUT /usuarios/:id)
   Future<Usuario> updateUser(Usuario user) async {
-    if (user.idUsuario == null) throw Exception('ID de usuario requerido para actualizar');
-    
+    if (user.idUsuario == null) {
+      throw Exception('ID de usuario requerido para actualizar');
+    }
+
     final data = await _api.put('${Endpoints.usuarios}/${user.idUsuario}', data: user.toJson());
-    final m = (data is Map && data['data'] != null) ? asMap(data['data']) : asMap(data);
-    return Usuario.fromJson(m);
+    // El backend devuelve { success: true, message: "...", data: {...} }
+    // Extraemos el objeto de usuario de la clave 'data'.
+    final dataMap = asMap(data);
+    return Usuario.fromJson(asMap(dataMap['data']));
   }
 
   /// 🔴 Eliminar usuario (DELETE /usuarios/:id)

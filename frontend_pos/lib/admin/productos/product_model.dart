@@ -1,11 +1,6 @@
-// lib/productos/product_model.dart
-
-/// Modelo de producto mapeado a la tabla `productos` del SQL:
-/// id_producto, nombre, codigo_barra, precio_compra, precio_venta, stock,
-/// unidad, fecha_caducidad, id_proveedor, id_categoria, imagen
-// lib/productos/product_model.dart
-
 /// Modelo de producto compatible con el backend Node.js
+import 'package:frontend_pos/core/http.dart';
+
 class Product {
   final int idProducto;
   final String nombre;
@@ -18,6 +13,9 @@ class Product {
   final int? idProveedor;
   final int? idCategoria;
   final String? imagen;
+  final String? codigoBarrasUrl;
+  final String? codigoQrUrl;
+  final Map<String, dynamic>? codigosPublicIds;
 
   const Product({
     required this.idProducto,
@@ -31,6 +29,9 @@ class Product {
     this.idProveedor,
     this.idCategoria,
     this.imagen,
+    this.codigoBarrasUrl,
+    this.codigoQrUrl,
+    this.codigosPublicIds,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -57,6 +58,9 @@ class Product {
       idCategoria:
           json['id_categoria'] == null ? null : _int(json['id_categoria']),
       imagen: json['imagen']?.toString(),
+      codigoBarrasUrl: json['codigo_barras_url']?.toString(),
+      codigoQrUrl: json['codigo_qr_url']?.toString(),
+      codigosPublicIds: json['codigos_public_ids'] != null ? asMap(json['codigos_public_ids']) : null,
     );
   }
 
@@ -72,5 +76,8 @@ class Product {
     'id_proveedor': idProveedor,
     'id_categoria': idCategoria,
     'imagen': imagen,
+    'codigo_barras_url': codigoBarrasUrl,
+    'codigo_qr_url': codigoQrUrl,
+    'codigos_public_ids': codigosPublicIds,
   };
 }
