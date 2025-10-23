@@ -162,7 +162,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                   crossAxisSpacing: 12,
                                   mainAxisSpacing: 12,
                                   childAspectRatio:
-                                      isMobile ? 2.8 : 2.2, // adaptable
+                                      isMobile ? 2.0 : 1.7, // adaptable
                                 ),
                             itemCount: _items.length + (_end ? 0 : 1),
                             itemBuilder: (context, index) {
@@ -451,7 +451,7 @@ class _ProductCard extends StatelessWidget {
                     color: Colors.orangeAccent,
                     icon: Icons.warning_amber_rounded,
                   ),
-                if (caducaPronto) const SizedBox(width: 6),
+                if (caducaPronto) const SizedBox(width: 4),
                 if (caducaPronto)
                   const _Tag(
                     text: 'Caduca pronto',
