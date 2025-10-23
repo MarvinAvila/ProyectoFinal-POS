@@ -9,6 +9,7 @@ import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
 import 'package:frontend_pos/gerente/ventas/top_productos_screen.dart';
 import 'package:frontend_pos/dueno/dashboard/crecimiento_mensual_chart.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart'; // 💬 Chatbot importado
 
 class DuenoDashboard extends StatefulWidget {
   const DuenoDashboard({super.key});
@@ -31,10 +32,10 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
   Future<void> _loadDashboard() async {
     try {
       setState(() => _isLoading = true);
-      
+
       // Primero obtenemos los datos
       final data = await repo.fetchDashboard();
-      
+
       // Luego actualizamos el estado
       setState(() {
         dashboardFuture = Future.value(data);
@@ -47,6 +48,7 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
       print('Error loading dashboard: $error');
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 700;
@@ -217,6 +219,30 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
                 ],
               ),
             ),
+          );
+        },
+      ),
+
+      // 💬 Chatbot flotante agregado sin alterar la lógica existente
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'chatbot_dueno',
+        backgroundColor: const Color(0xFF6A1B9A),
+        tooltip: 'Abrir Chatbot',
+        elevation: 6,
+        child: const Icon(Icons.chat, color: Colors.white),
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.white,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder:
+                (_) => const SizedBox(
+                  height: 600,
+                  child: ChatbotScreen(), // ✅ Chatbot modal
+                ),
           );
         },
       ),
