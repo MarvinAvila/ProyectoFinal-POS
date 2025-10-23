@@ -58,7 +58,9 @@ class ProductRepository {
     }
 
     final productos =
-        items.map((e) => Product.fromJson(Map<String, dynamic>.from(e))).toList();
+        items
+            .map((e) => Product.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
 
     return Page<Product>(
       items: productos,
@@ -70,34 +72,51 @@ class ProductRepository {
 
   Future<Product> getById(int id) async {
     final data = await _api.get('${Endpoints.productos}/$id');
-    final m = (data is Map && data['data'] != null) ? asMap(data['data']) : asMap(data);
+    final m =
+        (data is Map && data['data'] != null)
+            ? asMap(data['data'])
+            : asMap(data);
     return Product.fromJson(m);
   }
 
   /// 🆕 MÉTODO MULTIPLATAFORMA MEJORADO: Crear producto usando Model.toJson()
-  Future<Product> create(Product p, {File? imageFile, Uint8List? imageBytes, String? imageFileName}) async {
+  Future<Product> create(
+    Product p, {
+    File? imageFile,
+    Uint8List? imageBytes,
+    String? imageFileName,
+  }) async {
     try {
       // 🆕 USAR EL MODELO CORRECTAMENTE - toJson() ya tiene los nombres correctos
       final productData = p.toJson();
-      
+
       // 🆕 PREPARAR FormData CON LOS CAMPOS CORRECTOS
       final formData = FormData.fromMap({
         'nombre': productData['nombre'],
         'codigo_barra': productData['codigo_barra'],
-        'precio_compra': productData['precio_compra']?.toString(), // ✅ Convertir a string
-        'precio_venta': productData['precio_venta']?.toString(),   // ✅ Convertir a string
-        'stock': productData['stock']?.toString(),                 // ✅ Convertir a string
+        'precio_compra':
+            productData['precio_compra']?.toString(), // ✅ Convertir a string
+        'precio_venta':
+            productData['precio_venta']?.toString(), // ✅ Convertir a string
+        'stock': productData['stock']?.toString(), // ✅ Convertir a string
         'unidad': productData['unidad'],
-        if (productData['id_categoria'] != null) 
-          'id_categoria': productData['id_categoria']?.toString(), // ✅ Convertir a string
-        if (productData['id_proveedor'] != null) 
-          'id_proveedor': productData['id_proveedor']?.toString(), // ✅ Convertir a string
-        if (productData['fecha_caducidad'] != null) 
+        if (productData['id_categoria'] != null)
+          'id_categoria':
+              productData['id_categoria']?.toString(), // ✅ Convertir a string
+        if (productData['id_proveedor'] != null)
+          'id_proveedor':
+              productData['id_proveedor']?.toString(), // ✅ Convertir a string
+        if (productData['fecha_caducidad'] != null)
           'fecha_caducidad': productData['fecha_caducidad'],
       });
 
       // 🆕 SOPORTE MULTIPLATAFORMA PARA IMÁGENES
-      await _addImageToFormData(formData, imageFile: imageFile, imageBytes: imageBytes, imageFileName: imageFileName);
+      await _addImageToFormData(
+        formData,
+        imageFile: imageFile,
+        imageBytes: imageBytes,
+        imageFileName: imageFileName,
+      );
 
       // 🆕 DEBUG
       if (kDebugMode) {
@@ -105,13 +124,21 @@ class ProductRepository {
         formData.fields.forEach((field) {
           print('   ${field.key}: ${field.value}');
         });
-        print('   imagen: ${imageBytes != null ? "${imageBytes.length} bytes" : imageFile != null ? "File" : "null"}');
+        print(
+          '   imagen: ${imageBytes != null
+              ? "${imageBytes.length} bytes"
+              : imageFile != null
+              ? "File"
+              : "null"}',
+        );
       }
 
       final data = await _api.post(Endpoints.productos, data: formData);
-      final m = (data is Map && data['data'] != null) ? asMap(data['data']) : asMap(data);
+      final m =
+          (data is Map && data['data'] != null)
+              ? asMap(data['data'])
+              : asMap(data);
       return Product.fromJson(m);
-      
     } catch (e) {
       if (kDebugMode) {
         print('❌ [Repository] Error en create: $e');
@@ -121,11 +148,16 @@ class ProductRepository {
   }
 
   /// 🆕 MÉTODO MULTIPLATAFORMA MEJORADO: Actualizar producto usando Model.toJson()
-  Future<Product> update(Product p, {File? imageFile, Uint8List? imageBytes, String? imageFileName}) async {
+  Future<Product> update(
+    Product p, {
+    File? imageFile,
+    Uint8List? imageBytes,
+    String? imageFileName,
+  }) async {
     try {
       // 🆕 USAR EL MODELO CORRECTAMENTE
       final productData = p.toJson();
-      
+
       final formData = FormData.fromMap({
         'nombre': productData['nombre'],
         'codigo_barra': productData['codigo_barra'],
@@ -133,16 +165,21 @@ class ProductRepository {
         'precio_venta': productData['precio_venta']?.toString(),
         'stock': productData['stock']?.toString(),
         'unidad': productData['unidad'],
-        if (productData['id_categoria'] != null) 
+        if (productData['id_categoria'] != null)
           'id_categoria': productData['id_categoria']?.toString(),
-        if (productData['id_proveedor'] != null) 
+        if (productData['id_proveedor'] != null)
           'id_proveedor': productData['id_proveedor']?.toString(),
-        if (productData['fecha_caducidad'] != null) 
+        if (productData['fecha_caducidad'] != null)
           'fecha_caducidad': productData['fecha_caducidad'],
       });
 
       // 🆕 SOPORTE MULTIPLATAFORMA PARA IMÁGENES
-      await _addImageToFormData(formData, imageFile: imageFile, imageBytes: imageBytes, imageFileName: imageFileName);
+      await _addImageToFormData(
+        formData,
+        imageFile: imageFile,
+        imageBytes: imageBytes,
+        imageFileName: imageFileName,
+      );
 
       if (kDebugMode) {
         print('📤 [Repository] Actualizando producto usando Model.toJson():');
@@ -151,10 +188,15 @@ class ProductRepository {
         });
       }
 
-      final data = await _api.put('${Endpoints.productos}/${p.idProducto}', data: formData);
-      final m = (data is Map && data['data'] != null) ? asMap(data['data']) : asMap(data);
+      final data = await _api.put(
+        '${Endpoints.productos}/${p.idProducto}',
+        data: formData,
+      );
+      final m =
+          (data is Map && data['data'] != null)
+              ? asMap(data['data'])
+              : asMap(data);
       return Product.fromJson(m);
-      
     } catch (e) {
       if (kDebugMode) {
         print('❌ [Repository] Error en update: $e');
@@ -178,22 +220,26 @@ class ProductRepository {
           filename: imageFileName,
         );
         formData.files.add(MapEntry('imagen', multipartFile));
-        
+
         if (kDebugMode) {
-          print('🖼️ [Repository/WEB] Imagen preparada: $imageFileName (${imageBytes.length} bytes)');
+          print(
+            '🖼️ [Repository/WEB] Imagen preparada: $imageFileName (${imageBytes.length} bytes)',
+          );
         }
       }
     } else {
       // Para MÓVIL: usar File
       if (imageFile != null) {
-        formData.files.add(MapEntry(
-          'imagen',
-          await MultipartFile.fromFile(
-            imageFile.path,
-            filename: imageFile.path.split('/').last,
+        formData.files.add(
+          MapEntry(
+            'imagen',
+            await MultipartFile.fromFile(
+              imageFile.path,
+              filename: imageFile.path.split('/').last,
+            ),
           ),
-        ));
-        
+        );
+
         if (kDebugMode) {
           print('🖼️ [Repository/MÓVIL] Imagen preparada: ${imageFile.path}');
         }

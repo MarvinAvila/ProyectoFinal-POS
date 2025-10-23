@@ -81,24 +81,36 @@ const productoController = {
       const sortField = validSortFields.includes(sortBy) ? sortBy : "nombre";
       const order = sortOrder.toUpperCase() === "DESC" ? "DESC" : "ASC";
 
-      const whereSQL = whereConditions.length
-        ? `WHERE ${whereConditions.join(" AND ")}`
-        : "";
-      params.push(limitNum, offset);
+     // Construir la lista de condiciones WHERE
+const whereSQL = whereConditions.length
+  ? `WHERE ${whereConditions.join(" AND ")}`
+  : "";
 
-      const sql = `
-                SELECT p.*, 
-                       c.nombre as categoria_nombre, 
-                       pr.nombre as proveedor_nombre,
-                       (p.precio_venta - p.precio_compra) as ganancia_unitaria,
-                       (p.precio_venta - p.precio_compra) / NULLIF(p.precio_compra, 0) * 100 as margen_ganancia
-                FROM productos p
-                LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-                LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
-                ${whereSQL}
-                ORDER BY p.${sortField} ${order}
-                LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-            `;
+// 🟣 Calcular posiciones correctas para LIMIT y OFFSET
+params.push(limitNum);
+params.push(offset);
+
+const limitIndex = params.length - 1;
+const offsetIndex = params.length;
+
+// 🧩 Log temporal para depurar
+logger.debug("🧮 Consulta productos ejecutada", { whereSQL, params });
+
+// 🟣 Consulta SQL corregida
+const sql = `
+  SELECT p.*, 
+         c.nombre AS categoria_nombre, 
+         pr.nombre AS proveedor_nombre,
+         (p.precio_venta - p.precio_compra) AS ganancia_unitaria,
+         (p.precio_venta - p.precio_compra) / NULLIF(p.precio_compra, 0) * 100 AS margen_ganancia
+  FROM productos p
+  LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+  LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
+  ${whereSQL}
+  ORDER BY p.${sortField} ${order}
+  LIMIT $${limitIndex} OFFSET $${offsetIndex};
+`;
+
 
       const result = await client.query(sql, params);
 
