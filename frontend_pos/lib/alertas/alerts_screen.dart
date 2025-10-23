@@ -60,7 +60,8 @@ class AlertsController extends ChangeNotifier {
   Future<void> markAsAttended(AlertItem a) async {
     try {
       // ✅ Tu backend espera un PATCH a /alertas/:id/atendida
-      await _api.put('${Endpoints.alertas}/${a.id}/atendida');
+      await _api.patch("${Endpoints.alertas}/${a.id}/atendida");
+
       _items =
           _items
               .map((x) => x.id == a.id ? x.copyWith(attended: true) : x)

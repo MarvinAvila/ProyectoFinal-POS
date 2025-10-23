@@ -43,9 +43,7 @@ class ApiClient {
             o.headers['Authorization'] = 'Bearer $token';
           }
           if (kDebugMode) {
-            debugPrint(
-              '[API ${o.method}] ${o.uri}',
-            );
+            debugPrint('[API ${o.method}] ${o.uri}');
           }
           return h.next(o);
         },
@@ -147,6 +145,32 @@ class ApiClient {
   }) async {
     try {
       final res = await _dio.put(
+        path,
+        data: data,
+        queryParameters: query,
+        options: Options(headers: headers),
+      );
+      return _parse(res);
+    } on DioException catch (e) {
+      if (e.response != null) {
+        return _parse(e.response!);
+      }
+      throw ApiError(
+        status: e.response?.statusCode,
+        message: e.message ?? 'Error de conexión',
+        data: e.response?.data,
+      );
+    }
+  }
+
+  Future<dynamic> patch(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? query,
+    Map<String, dynamic>? headers,
+  }) async {
+    try {
+      final res = await _dio.patch(
         path,
         data: data,
         queryParameters: query,

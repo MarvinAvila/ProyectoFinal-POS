@@ -21,6 +21,7 @@ router.post('/stock-bajo', authMiddleware.requireRole(['admin', 'gerente', 'duen
 // GET /alertas/:id - Obtener alerta por ID
 router.get('/:id', authMiddleware.requireRole(['admin', 'gerente', 'dueno']), alertaController.getById);
 
+router.put('/:id/atendida', alertaController.marcarAtendida);
 // PATCH /alertas/:id/atendida - Marcar alerta como atendida
 router.patch('/:id/atendida', authMiddleware.requireRole(['admin', 'gerente', 'dueno']), alertaController.marcarAtendida);
 
