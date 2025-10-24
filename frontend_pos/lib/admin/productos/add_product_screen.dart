@@ -10,6 +10,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'product_model.dart';
 import 'product_repository.dart';
+import 'package:provider/provider.dart'; // ✅ 1. Importar Provider
+import '../categorias/categories_controller.dart'; // ✅ 2. Importar el controlador
+import '../categorias/category_model.dart'; // ✅ 1. Importar modelo
+import '../categorias/category_repository.dart'; // ✅ 2. Importar repositorio
+import '../categorias/category_form.dart'; // ✅ 3. Importar formulario de categoría
 import '../../utils/image_picker_utils.dart';
 
 class AddProductScreen extends StatefulWidget {
@@ -29,7 +34,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _precioCompraCtrl = TextEditingController();
   final _precioCtrl = TextEditingController();
   final _stockCtrl = TextEditingController();
-  final _categoriaCtrl = TextEditingController();
 
   String? _unidadSeleccionada;
   bool _loading = false;
@@ -39,6 +43,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
   String? _networkImageUrl;
   String? _selectedFileName; // 🆕 Guardar nombre del archivo
 
+  // ✅ 4. Nuevas variables de estado para las categorías
+  List<Categoria> _categorias = [];
+  int? _idCategoriaSeleccionada;
+  bool _loadingCategories = true;
+
   @override
   void initState() {
     super.initState();
@@ -47,12 +56,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (p != null) {
       _codigoCtrl.text = p.codigoBarra;
       _nombreCtrl.text = p.nombre;
-      _precioCompraCtrl.text = p.precioCompra?.toString() ?? '';
+      _precioCompraCtrl.text = p.precioCompra.toString(); // ✅ 3. Quitar operador innecesario
       _precioCtrl.text = p.precioVenta.toString();
       _stockCtrl.text = p.stock.toString();
       _unidadSeleccionada = p.unidad;
-      _categoriaCtrl.text = p.idCategoria?.toString() ?? '';
+      _idCategoriaSeleccionada = p.idCategoria;
       _networkImageUrl = p.imagen;
+    }
+
+    _loadCategories(); // ✅ 5. Cargar categorías al iniciar la pantalla
+  }
+
+  // ✅ 6. Nuevo método para obtener las categorías de la API
+  Future<void> _loadCategories() async {
+    setState(() => _loadingCategories = true);
+    try {
+      // Usamos un repositorio temporal para esta tarea
+      final repo = CategoryRepository();
+      final page = await repo.list();
+      setState(() => _categorias = page.items);
+    } catch (e) {
+      _showError('Error al cargar categorías: $e');
+    } finally {
+      setState(() => _loadingCategories = false);
     }
   }
 
@@ -108,7 +134,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       precioVenta: double.tryParse(_precioCtrl.text) ?? 0,
       stock: double.tryParse(_stockCtrl.text) ?? 0,
       unidad: _unidadSeleccionada ?? 'pieza',
-      idCategoria: int.tryParse(_categoriaCtrl.text),
+      idCategoria: _idCategoriaSeleccionada, // ✅ 7. Usar el ID del dropdown
       idProveedor: null,
       fechaCaducidad: null,
     );
@@ -172,8 +198,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final tempFile = File('${tempDir.path}/$_selectedFileName');
       await tempFile.writeAsBytes(_imageBytes!);
       return tempFile;
-    } catch (e) {
-      print('Error creando archivo temporal: $e');
+    } catch (e) { // ✅ 4. Usar debugPrint en lugar de print
+      debugPrint('Error creando archivo temporal: $e');
       return null;
     }
   }
@@ -356,7 +382,53 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
               ),
 
-              _buildField(_categoriaCtrl, 'Categoría'),
+              // ✅ 8. Reemplazar el campo de texto por un Dropdown con botón de "Agregar"
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        value: _idCategoriaSeleccionada,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Categoría',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          suffixIcon: _loadingCategories
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12.0),
+                                  child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2)),
+                                )
+                              : null,
+                        ),
+                        items: _categorias.map((cat) {
+                          return DropdownMenuItem(
+                              value: cat.idCategoria, child: Text(cat.nombre));
+                        }).toList(),
+                        onChanged: (v) => setState(() => _idCategoriaSeleccionada = v),
+                        validator: (v) => v == null ? 'Seleccione una categoría' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // ✅ 9. Botón para crear una nueva categoría
+                    IconButton.filled(
+                      icon: const Icon(Icons.add),
+                      tooltip: 'Nueva Categoría',
+                      style: IconButton.styleFrom(
+                        padding: const EdgeInsets.all(16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _crearNuevaCategoria,
+                    ),
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 24),
 
@@ -399,6 +471,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ),
       ),
     );
+  }
+
+  // ✅ 10. Lógica para abrir el formulario de creación de categoría
+  Future<void> _crearNuevaCategoria() async {
+    // Usamos un controlador temporal para el formulario
+    final categoriesController = CategoriesController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => ChangeNotifierProvider.value(
+        value: categoriesController,
+        child: const CategoryForm(),
+      ),
+    );
+
+    // Si el formulario se guardó con éxito (result == true)
+    if (result == true) {
+      // Recargamos la lista de categorías para que incluya la nueva
+      await _loadCategories();
+      // Opcional: auto-seleccionar la categoría recién creada
+      final nuevaCategoria = categoriesController.categorias.last;
+      setState(() => _idCategoriaSeleccionada = nuevaCategoria.idCategoria);
+    }
   }
 
   Widget _buildField(

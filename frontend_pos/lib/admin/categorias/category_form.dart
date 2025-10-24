@@ -73,53 +73,40 @@ class _CategoryFormState extends State<CategoryForm> {
 
   @override
   Widget build(BuildContext context) {
-    final editando = widget.categoria != null;
+    final isEditing = widget.categoria != null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(editando ? 'Editar Categoría' : 'Nueva Categoría'),
-        backgroundColor: const Color(0xFF5D3A9B),
-        foregroundColor: Colors.white,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: nombreCtrl,
-                decoration: const InputDecoration(labelText: 'Nombre'),
-                validator:
-                    (v) =>
-                        v == null || v.trim().isEmpty
-                            ? 'Ingrese un nombre'
-                            : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: descripcionCtrl,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Descripción'),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.save),
-                label: Text(
-                  _saving
-                      ? 'Guardando...'
-                      : (editando ? 'Actualizar' : 'Guardar'),
-                ),
-                onPressed: _saving ? null : _guardar,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5D3A9B),
-                  minimumSize: const Size(double.infinity, 48),
-                ),
-              ),
-            ],
-          ),
+    return AlertDialog(
+      title: Text(isEditing ? 'Editar Categoría' : 'Nueva Categoría'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: nombreCtrl,
+              decoration: const InputDecoration(labelText: 'Nombre'),
+              validator: (v) =>
+                  v == null || v.trim().isEmpty ? 'Ingrese un nombre' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: descripcionCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Descripción'),
+            ),
+          ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _guardar,
+          child: Text(isEditing ? 'Actualizar' : 'Guardar'),
+        ),
+      ],
     );
   }
 }

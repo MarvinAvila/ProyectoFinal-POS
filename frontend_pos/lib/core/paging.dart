@@ -59,6 +59,7 @@ class PageParser {
     int page,
     FromJson<T> fromJson, {
     int pageSize = 20,
+    String? itemsKey, // ✅ 1. AÑADIR el parámetro opcional
   }) {
     List list;
     int total = 0;
@@ -68,9 +69,11 @@ class PageParser {
     if (data is Map) {
       final map = Map<String, dynamic>.from(data);
 
-      // Lista de elementos con distintas llaves típicas
-      final rawList =
-          map['data'] ?? map['items'] ?? map['rows'] ?? map['result'] ?? [];
+      // ✅ FIX: Lógica unificada. Usa itemsKey si existe, si no, busca en las llaves comunes.
+      final rawList = (itemsKey != null && map.containsKey(itemsKey))
+          ? map[itemsKey]
+          : map['data'] ?? map['items'] ?? map['rows'] ?? map['result'] ?? [];
+
       list = rawList is List ? rawList : <dynamic>[];
 
       // Total de elementos (múltiples variantes)
