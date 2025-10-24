@@ -6,7 +6,7 @@ import 'gerente_repository.dart';
 import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
 import 'package:frontend_pos/alertas/alerts_screen.dart';
 import 'package:frontend_pos/gerente/ventas/top_productos_screen.dart';
-import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart'; // 💬 agregado
+import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart';
 
 class GerenteDashboard extends StatefulWidget {
   const GerenteDashboard({super.key});
@@ -17,8 +17,9 @@ class GerenteDashboard extends StatefulWidget {
 
 class _GerenteDashboardScreenState extends State<GerenteDashboard> {
   final repo = GerenteDashboardRepository();
-  late Future<GerenteDashboardData> dashboardFuture;
+  GerenteDashboardData? _dashboardData; // ✅ Cambiar late Future por nullable
   bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -28,19 +29,21 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
 
   Future<void> _loadDashboard() async {
     try {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
 
-      // Primero obtenemos los datos
       final data = await repo.fetchDashboard();
 
-      // Luego actualizamos el estado
       setState(() {
-        dashboardFuture = Future.value(data);
+        _dashboardData = data;
         _isLoading = false;
       });
     } catch (error) {
       setState(() {
         _isLoading = false;
+        _error = error.toString();
       });
       print('Error loading dashboard: $error');
     }
@@ -77,115 +80,120 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
         ],
       ),
 
-      body: FutureBuilder<GerenteDashboardData>(
-        future: dashboardFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error: ${snapshot.error}',
-                style: const TextStyle(color: Colors.red),
-              ),
-            );
-          }
-
-          final data = snapshot.data!;
-
-          return RefreshIndicator(
-            onRefresh: _loadDashboard,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildWelcomePanel(context, isMobile),
-                  const SizedBox(height: 24),
-
-                  // 🟩 TARJETAS PRINCIPALES
-                  GridView.count(
-                    crossAxisCount: isMobile ? 1 : 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Error: $_error',
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadDashboard,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              )
+              : RefreshIndicator(
+                onRefresh: _loadDashboard,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildCard(
-                        title: 'Ventas del Día',
-                        value: currency.format(data.ventasHoy),
-                        icon: Icons.attach_money,
-                        color1: const Color(0xFFFFD6E8),
-                        color2: const Color(0xFFD1C4E9),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const VentasDiaScreen(),
-                            ),
-                          ).then((_) => _loadDashboard());
-                        },
-                      ),
-                      _buildCard(
-                        title: 'Ventas',
-                        value: currency.format(data.ventasMes),
-                        icon: Icons.show_chart,
-                        color1: const Color(0xFFB3E5FC),
-                        color2: const Color(0xFF81D4FA),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const VentasScreen(),
-                            ),
-                          ).then((_) => _loadDashboard());
-                        },
-                      ),
-                      _buildCard(
-                        title: 'Top Productos',
-                        value: '${data.topProductos.length}',
-                        icon: Icons.leaderboard,
-                        color1: const Color(0xFFFFF59D),
-                        color2: const Color(0xFFFFCC80),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const TopProductosScreen(),
-                            ),
-                          ).then((_) => _loadDashboard());
-                        },
-                      ),
-                      _buildCard(
-                        title: 'Alertas Pendientes',
-                        value: '${data.alertasPendientes}',
-                        icon: Icons.warning_amber_rounded,
-                        color1: const Color(0xFFFFF59D),
-                        color2: const Color(0xFFFFCC80),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const AlertsScreen(),
-                            ),
-                          ).then((_) => _loadDashboard());
-                        },
+                      _buildWelcomePanel(context, isMobile),
+                      const SizedBox(height: 24),
+
+                      // 🟩 TARJETAS PRINCIPALES
+                      GridView.count(
+                        crossAxisCount: isMobile ? 1 : 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          _buildCard(
+                            title: 'Ventas del Día',
+                            value: currency.format(_dashboardData!.ventasHoy),
+                            icon: Icons.attach_money,
+                            color1: const Color(0xFFFFD6E8),
+                            color2: const Color(0xFFD1C4E9),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const VentasDiaScreen(),
+                                ),
+                              ).then((_) => _loadDashboard());
+                            },
+                          ),
+                          _buildCard(
+                            title: 'Ventas',
+                            value: currency.format(_dashboardData!.ventasMes),
+                            icon: Icons.show_chart,
+                            color1: const Color(0xFFB3E5FC),
+                            color2: const Color(0xFF81D4FA),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const VentasScreen(),
+                                ),
+                              ).then((_) => _loadDashboard());
+                            },
+                          ),
+                          _buildCard(
+                            title: 'Top Productos',
+                            value: '${_dashboardData!.topProductos.length}',
+                            icon: Icons.leaderboard,
+                            color1: const Color(0xFFFFF59D),
+                            color2: const Color(0xFFFFCC80),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const TopProductosScreen(),
+                                ),
+                              ).then((_) => _loadDashboard());
+                            },
+                          ),
+                          _buildCard(
+                            title: 'Alertas Pendientes',
+                            value: '${_dashboardData!.alertasPendientes}',
+                            icon: Icons.warning_amber_rounded,
+                            color1: const Color(0xFFFFF59D),
+                            color2: const Color(0xFFFFCC80),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const AlertsScreen(),
+                                ),
+                              ).then((_) => _loadDashboard());
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          );
-        },
-      ),
 
-      // 💬 Chatbot flotante — agregado sin afectar la lógica
+      // 💬 Chatbot flotante
       floatingActionButton: FloatingActionButton(
         heroTag: 'chatbot_button_gerente',
-        backgroundColor: Colors.teal, // color distinto al admin
+        backgroundColor: Colors.teal,
         elevation: 6,
         child: const Icon(Icons.chat, color: Colors.white),
         onPressed: () {
@@ -196,11 +204,7 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            builder:
-                (_) => const SizedBox(
-                  height: 600,
-                  child: ChatbotScreen(), // ✅ usa token actual del gerente
-                ),
+            builder: (_) => const SizedBox(height: 600, child: ChatbotScreen()),
           );
         },
       ),
