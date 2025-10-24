@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
@@ -17,14 +16,16 @@ class EmpleadoDashboardScreen extends StatefulWidget {
 
 class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
   // ✅ Controlador para la cámara y el campo de texto manual
-  final MobileScannerController _cameraController = MobileScannerController();
-  final TextEditingController _manualBarcodeController = TextEditingController();
+  late final MobileScannerController _cameraController;
+  final TextEditingController _manualBarcodeController =
+      TextEditingController();
   String? _lastScannedBarcode;
   DateTime? _lastScanTime;
 
   @override
   void initState() {
     super.initState();
+    _cameraController = MobileScannerController();
   }
 
   @override
@@ -67,9 +68,9 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     }
   }
@@ -126,7 +127,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
         actions: [
           // Botón para alternar la cámara
           IconButton(
-            icon: ValueListenableBuilder(
+            icon: ValueListenableBuilder<TorchState>(
               valueListenable: _cameraController.torchState,
               builder: (context, state, child) {
                 return Icon(
@@ -166,10 +167,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
 
           // 🟣 SECCIÓN CARRITO (oculta en pantallas pequeñas)
           if (!isMobile)
-            Expanded(
-              flex: 1,
-              child: _buildCarrito(context, currency),
-            ),
+            Expanded(flex: 1, child: _buildCarrito(context, currency)),
         ],
       ),
 
@@ -294,21 +292,43 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
                   elevation: 1,
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   child: ListTile(
-                    leading: p.imagen != null && p.imagen!.isNotEmpty
-                        ? Image.network(p.imagen!, width: 40, height: 40, fit: BoxFit.cover)
-                        : const Icon(Icons.inventory_2_outlined, color: Colors.grey),
-                    title: Text(p.nombre, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    leading:
+                        p.imagen != null && p.imagen!.isNotEmpty
+                            ? Image.network(
+                              p.imagen!,
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                            )
+                            : const Icon(
+                              Icons.inventory_2_outlined,
+                              color: Colors.grey,
+                            ),
+                    title: Text(
+                      p.nombre,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     subtitle: Text(currency.format(line.price)),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent),
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            color: Colors.redAccent,
+                          ),
                           onPressed: () => cart.decrement(i),
                         ),
-                        Text('${line.qty.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          '${line.qty.toInt()}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         IconButton(
-                          icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                          icon: const Icon(
+                            Icons.add_circle_outline,
+                            color: Colors.green,
+                          ),
                           onPressed: () => cart.increment(i),
                         ),
                       ],
@@ -330,16 +350,17 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
           ElevatedButton.icon(
             onPressed: cart.loading ? null : () => _finalizarVenta(context),
             icon: const Icon(Icons.check_circle),
-            label: cart.loading
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Finalizar venta'),
+            label:
+                cart.loading
+                    ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                    : const Text('Finalizar venta'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade700,
               minimumSize: const Size(double.infinity, 40),
