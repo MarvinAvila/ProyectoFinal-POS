@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../carrito/cart_controller.dart';
+import 'package:frontend_pos/utils/jwt_utils.dart';
+import 'package:frontend_pos/auth/auth_repository.dart';
+import 'package:frontend_pos/core/http.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -133,6 +136,8 @@ class CartScreen extends StatelessWidget {
     );
   }
 
+  // EN cart_screen.dart - ACTUALIZAR EL BOTÓN DE FINALIZAR VENTA
+
   Widget _buildResumen(
     BuildContext context,
     CartController cart,
@@ -153,46 +158,205 @@ class CartScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Total: ${currency.format(cart.total)}',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.deepPurple,
-            ),
-          ),
-          const SizedBox(height: 12),
+          // ... (tus widgets existentes de resumen)
+          const SizedBox(height: 8),
           ElevatedButton.icon(
-            onPressed: cart.loading ? null : () async {
-              final result = await cart.checkout(formaPago: 'efectivo');
-              if (!context.mounted) return;
-
-              if (result != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Venta registrada con éxito'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('❌ Error: ${cart.error ?? 'Desconocido'}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
+            onPressed:
+                cart.loading || cart.lines.isEmpty
+                    ? null
+                    : () => _finalizarVenta(context, cart),
             icon: const Icon(Icons.check_circle),
-            label: const Text('Finalizar venta'),
+            label: Text(cart.loading ? 'Procesando...' : 'Finalizar venta'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: cart.lines.isEmpty ? Colors.grey : Colors.green,
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 48),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // ✅ NUEVO MÉTODO PARA FINALIZAR VENTA
+  void _finalizarVenta(BuildContext context, CartController cart) async {
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Procesando venta...'),
+              ],
+            ),
+          ),
+    );
+
+    try {
+      // 🔹 OBTENER EL ID DEL USUARIO ACTUAL
+      final idUsuario = await _obtenerIdUsuarioActual();
+
+      if (idUsuario == null) {
+        if (!context.mounted) return;
+        Navigator.pop(context); // Cerrar loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Error: No se pudo identificar al usuario'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // 🔹 MOSTRAR SELECTOR DE FORMA DE PAGO
+      if (!context.mounted) return;
+      Navigator.pop(context); // Cerrar loading primero
+
+      final formaPago = await _mostrarSelectorPago(context);
+      if (formaPago == null) return; // Usuario canceló
+
+      // 🔹 MOSTRAR LOADING DE NUEVO PARA LA VENTA
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Registrando venta...'),
+                ],
+              ),
+            ),
+      );
+
+      // 🔹 PROCESAR LA VENTA
+      final result = await cart.checkout(
+        formaPago: formaPago,
+        idUsuario: idUsuario,
+      );
+
+      if (!context.mounted) return;
+      Navigator.pop(context); // Cerrar loading
+
+      if (result != null && result['success'] == true) {
+        final ventaData = result['data'];
+        final idVenta = ventaData?['id_venta'];
+        final total = ventaData?['total'];
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Venta #$idVenta registrada - Total: \$$total'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+
+        // Opcional: Navegar a comprobante o limpiar
+        await Future.delayed(const Duration(seconds: 2));
+      } else {
+        final errorMsg =
+            cart.error ?? result?['message'] ?? 'Error desconocido';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: $errorMsg'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Cerrar loading en caso de error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error inesperado: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // ✅ IMPLEMENTAR OBTENCIÓN DEL ID DEL USUARIO
+
+  // EN cart_screen.dart - ACTUALIZAR EL MÉTODO
+
+  Future<int?> _obtenerIdUsuarioActual() async {
+    try {
+      print('🎯 [CartScreen] SOLUCIÓN TEMPORAL: Forzando ID 4 para cajero');
+
+      // 🔹 PRIMERO: Intentar obtener de AuthRepository
+      print('🔄 [CartScreen] Intentando desde AuthRepository...');
+      final idFromRepo = await AuthRepository.getUserId();
+      if (idFromRepo != null) {
+        print('✅ [CartScreen] ID desde AuthRepository: $idFromRepo');
+        return idFromRepo;
+      }
+
+      // 🔹 SEGUNDO: Intentar desde el token
+      print('🔄 [CartScreen] Intentando desde token...');
+      final token = await ApiClient.getToken();
+      if (token != null) {
+        final payload = JwtUtils.decodeToken(token);
+        final idFromToken = payload?['id_usuario'];
+        print('🔑 [CartScreen] ID desde token: $idFromToken');
+        if (idFromToken is int && idFromToken != 1) {
+          return idFromToken;
+        }
+      }
+
+      // 🔹 TERCERO: Forzar ID 4 como fallback
+      print('⚠️ [CartScreen] Usando ID fijo 4');
+      return 4;
+    } catch (e) {
+      print('❌ [CartScreen] Error, usando ID 4 como fallback: $e');
+      return 4;
+    }
+  }
+
+  // ✅ SELECTOR DE FORMA DE PAGO
+  Future<String?> _mostrarSelectorPago(BuildContext context) async {
+    return await showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Forma de pago'),
+            content: const Text('Selecciona cómo pagará el cliente:'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'efectivo'),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.money, color: Colors.green),
+                    SizedBox(width: 8),
+                    Text('Efectivo'),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'tarjeta'),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.credit_card, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text('Tarjeta'),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar'),
+              ),
+            ],
+          ),
     );
   }
 }

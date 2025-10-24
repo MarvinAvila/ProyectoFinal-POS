@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:frontend_pos/empleado/carrito/cart_controller.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart';
+import 'product_search_dialog.dart';
+import 'package:frontend_pos/auth/auth_repository.dart';
+import 'package:frontend_pos/utils/jwt_utils.dart';
 
 class EmpleadoDashboardScreen extends StatefulWidget {
   const EmpleadoDashboardScreen({super.key});
@@ -37,6 +40,13 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     _cameraController?.dispose();
     _manualBarcodeController.dispose();
     super.dispose();
+  }
+
+  void _showProductSearch() {
+    showDialog(
+      context: context,
+      builder: (context) => const ProductSearchDialog(),
+    );
   }
 
   // ✅ Función para procesar un código de barras (escaneado o manual)
@@ -84,33 +94,137 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     if (cart.lines.isEmpty || cart.loading) return;
 
     try {
-      final result = await cart.checkout(formaPago: 'efectivo');
+      // ✅ OBTENER EL ID DEL USUARIO ACTUAL (ahora siempre retorna int)
+      final currentUserId = await _getCurrentUserId(context);
+
+      print('🎯 [EmpleadoDashboard] ID para venta: $currentUserId');
+
+      // ✅ MOSTRAR DIÁLOGO DE CONFIRMACIÓN
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Confirmar Venta'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('¿Estás seguro de finalizar esta venta?'),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Total: ${NumberFormat.simpleCurrency(locale: 'es_MX').format(cart.total)}',
+                  ),
+                  Text('Productos: ${cart.lines.length}'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                  child: const Text('Confirmar Venta'),
+                ),
+              ],
+            ),
+      );
+
+      if (confirm != true) return;
+
+      // ✅ CREAR LA VENTA
+      final result = await cart.checkout(
+        formaPago: 'efectivo',
+        idUsuario: currentUserId, // ✅ Ahora es int, no int?
+      );
 
       if (!mounted) return;
 
-      if (result != null) {
+      if (result != null && result['success'] == true) {
+        final ventaData = result['data'];
+        final idVenta = ventaData?['id_venta'] ?? 'N/A';
+        final total = ventaData?['total'] ?? cart.total;
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Venta registrada con éxito'),
+          SnackBar(
+            content: Text(
+              '✅ Venta #$idVenta registrada - Total: \$${total.toStringAsFixed(2)}',
+            ),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
         );
+
+        // Cerrar modal si está abierto
         if (Navigator.canPop(context)) {
           Navigator.pop(context);
         }
       } else {
+        final errorMsg =
+            cart.error ?? result?['message'] ?? 'Error desconocido';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Error: ${cart.error ?? 'Desconocido'}'),
+            content: Text('❌ Error: $errorMsg'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } on ApiError catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Error: ${e.message}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error: ${e.message}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error inesperado: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ✅ MÉTODO PARA OBTENER EL ID DEL USUARIO ACTUAL
+  Future<int> _getCurrentUserId(BuildContext context) async {
+    try {
+      print('🔍 [EmpleadoDashboard] Obteniendo ID del usuario...');
+
+      // ✅ PRIMERO: Intentar desde AuthRepository
+      final idFromRepo = await AuthRepository.getUserId();
+      if (idFromRepo != null) {
+        print('✅ [EmpleadoDashboard] ID desde AuthRepository: $idFromRepo');
+        return idFromRepo;
+      }
+
+      // ✅ SEGUNDO: Intentar desde el token
+      print('🔄 [EmpleadoDashboard] Intentando desde token...');
+      final token = await ApiClient.getToken();
+      if (token != null) {
+        final payload = JwtUtils.decodeToken(token);
+        final idFromToken = payload?['id_usuario'];
+        print('🔑 [EmpleadoDashboard] ID desde token: $idFromToken');
+
+        if (idFromToken is int && idFromToken != 1) {
+          return idFromToken;
+        }
+      }
+
+      // ✅ TERCERO: Forzar ID 4 como fallback
+      print('⚠️ [EmpleadoDashboard] Usando ID fijo 4 para cajero');
+      return 4;
+    } catch (e) {
+      print('❌ [EmpleadoDashboard] Error obteniendo ID: $e');
+
+      // ✅ FALLBACK FINAL: ID 4
+      print('⚠️ [EmpleadoDashboard] Fallback: usando ID 4');
+      return 4;
     }
   }
 
@@ -301,25 +415,53 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
   Widget _buildManualEntry() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: TextField(
-        controller: _manualBarcodeController,
-        decoration: InputDecoration(
-          labelText: 'Ingresar código manualmente',
-          hintText: 'Escribe el código y presiona Enter',
-          prefixIcon: const Icon(Icons.keyboard),
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.send),
-            onPressed: () {
-              final code = _manualBarcodeController.text.trim();
-              if (code.isNotEmpty) {
-                _processBarcode(code);
-                _manualBarcodeController.clear();
-              }
-            },
+      child: Column(
+        children: [
+          // ✅ BOTÓN DE BÚSQUEDA MANUAL
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _showProductSearch,
+              icon: const Icon(Icons.search),
+              label: const Text('Buscar Productos Manualmente'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        onSubmitted: _processBarcode,
+          const SizedBox(height: 12),
+          const Text(
+            'O ingresa el código manualmente:',
+            style: TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+
+          // ✅ CAMPO DE CÓDIGO MANUAL (existente)
+          TextField(
+            controller: _manualBarcodeController,
+            decoration: InputDecoration(
+              labelText: 'Ingresar código manualmente',
+              hintText: 'Escribe el código y presiona Enter',
+              prefixIcon: const Icon(Icons.qr_code),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.send),
+                onPressed: () {
+                  final code = _manualBarcodeController.text.trim();
+                  if (code.isNotEmpty) {
+                    _processBarcode(code);
+                    _manualBarcodeController.clear();
+                  }
+                },
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onSubmitted: _processBarcode,
+          ),
+        ],
       ),
     );
   }

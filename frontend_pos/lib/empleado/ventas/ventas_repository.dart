@@ -111,21 +111,39 @@ class VentaItem {
 /// ====== REPOSITORIO ======
 
 class VentasRepository {
-  final _api = ApiClient();
+  final ApiClient _api = ApiClient(); // ✅ Declarar correctamente
+
+  // ✅ MÉTODO createVenta DENTRO de la clase
+  Future<Map<String, dynamic>> createVenta(Map<String, dynamic> payload) async {
+    try {
+      // ignore: avoid_print
+      print('📦 [VentasRepository] Enviando payload: $payload');
+
+      final data = await _api.post(Endpoints.ventas, data: payload);
+      final response = (data is Map) ? Map<String, dynamic>.from(data) : {'ok': true};
+
+      // ignore: avoid_print
+      print('✅ [VentasRepository] Respuesta del backend: $response');
+      return response;
+    } on ApiError catch (e) {
+      // ignore: avoid_print
+      print('❌ [VentasRepository] Error API: ${e.message}');
+      rethrow;
+    } catch (e) {
+      // ignore: avoid_print
+      print('❌ [VentasRepository] Error inesperado: $e');
+      rethrow;
+    }
+  }
 
   /// Lista paginada de ventas con filtros opcionales.
-  ///
-  /// El backend puede devolver:
-  /// - {items:[...], total, page, ...}
-  /// - {data:[...], total, ...}
-  /// - [...]
   Future<Page<Venta>> list({
     int page = 1,
     int limit = 20,
     String? search,
     DateTime? from,
     DateTime? to,
-    String? formaPago, // 'efectivo' | 'tarjeta' | ...
+    String? formaPago,
   }) async {
     final query = <String, dynamic>{
       'page': page,
@@ -165,8 +183,7 @@ class VentasRepository {
     return Page<Venta>(items: items, page: page, pageSize: limit, total: total);
   }
 
-  /// Obtener una venta por ID (incluye cabecera; los items pueden venir embebidos
-  /// o pedirse aparte con [itemsByVenta]).
+  /// Obtener una venta por ID
   Future<Venta> getById(int id) async {
     final data = await _api.get('${Endpoints.ventas}/$id');
     final m =
@@ -176,30 +193,27 @@ class VentasRepository {
     return Venta.fromJson(m);
   }
 
-  /// Detalle (items) de una venta. Intenta varias formas comunes de ruta/respuesta.
+  /// Detalle (items) de una venta
   Future<List<VentaItem>> itemsByVenta(int ventaId) async {
     dynamic data;
 
-    // 1) Endpoint dedicado si existe: /detalle-venta?ventaId=...
     try {
       data = await _api.get(
         Endpoints.detalleVenta,
         query: {
           'ventaId': ventaId,
-          'id_venta': ventaId, // fallback
-          'venta': ventaId, // fallback
+          'id_venta': ventaId,
+          'venta': ventaId,
         },
       );
     } catch (_) {}
 
-    // 2) Algunos backends exponen /ventas/:id/detalle
     if (data == null) {
       try {
         data = await _api.get('${Endpoints.ventas}/$ventaId/detalle');
       } catch (_) {}
     }
 
-    // 3) O vienen embebidos en /ventas/:id -> { data: { items: [...] } }
     if (data == null) {
       try {
         final header = await _api.get('${Endpoints.ventas}/$ventaId');
@@ -228,13 +242,7 @@ class VentasRepository {
         .toList();
   }
 
-  /// Crear una venta. Útil si no usas el flujo del carrito o lo necesitas en otro lado.
-  ///
-  /// Estructura común del payload:
-  /// {
-  ///   forma_pago, subtotal, iva, total,
-  ///   items: [{ id_producto, cantidad, precio_unitario }]
-  /// }
+  /// Crear una venta (método alternativo)
   Future<Map<String, dynamic>> create({
     required String formaPago,
     required double subtotal,
@@ -258,9 +266,8 @@ class VentasRepository {
     return (data is Map) ? Map<String, dynamic>.from(data) : {'ok': true};
   }
 
-  /// (Opcional) Cancelar/eliminar una venta (ajusta según tu backend).
+  /// Cancelar/eliminar una venta
   Future<void> delete(int id) async {
-    // Algunos backends usan /ventas/:id, otros /ventas/:id/cancelar.
     try {
       await _api.delete('${Endpoints.ventas}/$id');
     } catch (_) {
@@ -268,15 +275,9 @@ class VentasRepository {
     }
   }
 
-  /// URL directa al comprobante (PDF/HTML) si tu backend lo expone.
-  // en lib/ventas/ventas_repository.dart
+  /// URL directa al comprobante
   String comprobanteUrl(int ventaId) {
-    // Si tu backend expone /comprobantes/:id
     return Env.url('/comprobantes/$ventaId');
-
-    // Si en tu backend es /ventas/:id/comprobante,
-    // usa esta en su lugar:
-    // return Env.url('${Endpoints.ventas}/$ventaId/comprobante');
   }
 
   String _fmtDate(DateTime d) =>

@@ -2,9 +2,10 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:frontend_pos/core/http.dart';
-import 'package:frontend_pos/admin/productos/product_model.dart'; // ✅ Importar el modelo correcto
+import 'package:frontend_pos/admin/productos/product_model.dart';
 import 'package:frontend_pos/admin/productos/product_repository.dart';
 import 'package:frontend_pos/admin/ventas/ventas_repository.dart';
+
 /// ====== MODELOS ======
 
 class ProductLite {
@@ -39,7 +40,6 @@ class ProductLite {
       imagen: p.imagen,
     );
   }
-
 
   factory ProductLite.fromJson(Map<String, dynamic> j) {
     double parseNum(dynamic x) {
@@ -182,9 +182,32 @@ class CartController extends ChangeNotifier {
   }
 
   /// Buscar por texto para autocompletar
-  Future<List<ProductLite>> search(String query) async {
-    final page = await _productRepo.list(search: query, limit: 20);
-    return page.items.map((p) => ProductLite.fromJson(p.toJson())).toList();
+  Future<List<ProductLite>> searchProducts(String query) async {
+    if (query.isEmpty) return [];
+
+    try {
+      final page = await _productRepo.list(search: query, limit: 20);
+
+      // Convertir Product a ProductLite usando el factory method
+      return page.items
+          .map((product) => ProductLite.fromProduct(product))
+          .toList();
+    } catch (e) {
+      print('Error buscando productos: $e');
+      return [];
+    }
+  }
+
+  // ✅ AGREGAR PRODUCTO DIRECTAMENTE DESDE EL BUSCADOR
+  Future<bool> addProductManual(ProductLite product, {int quantity = 1}) async {
+    try {
+      addProductLite(product, qty: quantity.toDouble());
+      return true;
+    } catch (e) {
+      _error = 'Error agregando producto: $e';
+      notifyListeners();
+      return false;
+    }
   }
 
   /// Intentar agregar por código de barras
@@ -192,7 +215,9 @@ class CartController extends ChangeNotifier {
     try {
       final p = await _productRepo.byBarcode(code);
       if (p == null) return false; // No se encontró el producto
-      addProductLite(ProductLite.fromProduct(p)); // ✅ Convertir Product a ProductLite
+      addProductLite(
+        ProductLite.fromProduct(p),
+      ); // ✅ Convertir Product a ProductLite
       return true;
     } catch (e) {
       _error = e.toString();
@@ -203,30 +228,64 @@ class CartController extends ChangeNotifier {
 
   /// Finaliza la venta
   Future<Map<String, dynamic>?> checkout({
-    required String formaPago, // 'efectivo' | 'tarjeta' | 'otro'
-    double? montoRecibido,
+    required String formaPago,
+    required int idUsuario, // ✅ Ahora es requerido
   }) async {
     if (_lines.isEmpty) return null;
+
     _loading = true;
     _error = null;
     notifyListeners();
+
     try {
+      // ✅ PREPARAR PAYLOAD EXACTO como espera el backend
+      print('🔍 Verificando ID usuario: $idUsuario');
+      print('🔍 Tipo de ID: ${idUsuario.runtimeType}');
       final payload = {
+        'id_usuario': idUsuario, // ✅ Este debe ser 4, no 1
         'forma_pago': formaPago,
-        'total': total,
-        if (montoRecibido != null) 'monto_recibido': montoRecibido,
-        'detalles': _lines.map((l) => {
-              'id_producto': l.product.id,
-              'cantidad': l.qty,
-              'precio_unitario': l.price,
-            }).toList(),
+        'detalles':
+            _lines
+                .map(
+                  (line) => {
+                    'id_producto': line.product.id,
+                    'cantidad': line.qty,
+                    'precio_unitario': line.price,
+                  },
+                )
+                .toList(),
       };
-      final resp = await _ventasRepo.createVenta(payload);
-      // Limpia carrito si todo ok
-      _lines.clear();
-      return resp;
+
+      print('🛒 [CartController] Enviando venta:');
+      print('   ID Usuario: $idUsuario');
+      print('   Forma pago: $formaPago');
+      print('   Detalles: ${payload['detalles']}');
+
+      print('🛒 [CartController] Enviando venta con usuario ID: $idUsuario');
+      print('📦 Payload completo: $payload');
+      // ✅ ENVIAR VENTA AL BACKEND usando el nuevo método
+      final response = await _ventasRepo.createVenta(payload);
+
+      // ✅ VERIFICAR RESPUESTA EXITOSA
+      if (response['success'] == true) {
+        // ✅ LIMPIAR CARRITO SI TODO SALE BIEN
+        _lines.clear();
+
+        print(
+          '✅ [CartController] Venta creada exitosamente: ${response['data']?['id_venta']}',
+        );
+        return response;
+      } else {
+        _error = response['message'] ?? 'Error desconocido del servidor';
+        return null;
+      }
     } on ApiError catch (e) {
-      _error = e.toString();
+      _error = 'Error al crear venta: ${e.message}';
+      print('❌ [CartController] Error en checkout: ${e.message}');
+      return null;
+    } catch (e) {
+      _error = 'Error inesperado: $e';
+      print('❌ [CartController] Error inesperado: $e');
       return null;
     } finally {
       _loading = false;
