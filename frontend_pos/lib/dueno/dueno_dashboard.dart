@@ -3,13 +3,13 @@ import 'package:frontend_pos/dueno/dashboard/iva_recaudado_screen.dart';
 import 'package:frontend_pos/dueno/dashboard/promedio_venta_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
-import 'package:frontend_pos/dueno/dashboard/dueno_repository.dart'; // ✅ ruta completa
+import 'package:frontend_pos/dueno/dashboard/dueno_repository.dart';
 import 'package:frontend_pos/alertas/alerts_screen.dart';
 import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
 import 'package:frontend_pos/gerente/ventas/top_productos_screen.dart';
 import 'package:frontend_pos/dueno/dashboard/crecimiento_mensual_chart.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart'; // 💬 Chatbot importado
+import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart';
 
 class DuenoDashboard extends StatefulWidget {
   const DuenoDashboard({super.key});
@@ -20,8 +20,9 @@ class DuenoDashboard extends StatefulWidget {
 
 class _DuenoDashboardState extends State<DuenoDashboard> {
   final repo = DuenoDashboardRepository();
-  late Future<DuenoDashboardData> dashboardFuture;
+  DuenoDashboardData? _dashboardData; // ✅ Cambiar late Future por nullable
   bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -31,14 +32,22 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
 
   Future<void> _loadDashboard() async {
     try {
-      setState(() => _isLoading = true);
-      final data = await repo.fetchDashboard();
       setState(() {
-        dashboardFuture = Future.value(data);
+        _isLoading = true;
+        _error = null;
+      });
+
+      final data = await repo.fetchDashboard();
+
+      setState(() {
+        _dashboardData = data;
         _isLoading = false;
       });
     } catch (error) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _error = error.toString();
+      });
       print('Error loading dashboard: $error');
     }
   }
@@ -74,154 +83,164 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
         ],
       ),
 
-      body: FutureBuilder<DuenoDashboardData>(
-        future: dashboardFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error: ${snapshot.error}',
-                style: const TextStyle(color: Colors.red),
-              ),
-            );
-          }
-
-          final data = snapshot.data!;
-
-          return RefreshIndicator(
-            onRefresh: _loadDashboard,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildWelcomePanel(context, isMobile),
-                  const SizedBox(height: 24),
-
-                  // 🟦 MENÚ HORIZONTAL DEL DUEÑO (sustituye las tarjetas)
-                  Container(
-                    margin: const EdgeInsets.only(top: 8, bottom: 20),
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF311B92),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.deepPurple.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Error: $_error',
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
                     ),
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      children: [
-                        _buildTopButton(
-                          context,
-                          icon: Icons.receipt_long_outlined,
-                          label: 'Ventas',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const VentasScreen(),
-                              ),
-                            ).then((_) => _loadDashboard());
-                          },
-                        ),
-                        _buildTopButton(
-                          context,
-                          icon: Icons.account_balance_wallet_outlined,
-                          label: 'IVA',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const IvaRecaudadoScreen(),
-                              ),
-                            ).then((_) => _loadDashboard());
-                          },
-                        ),
-                        _buildTopButton(
-                          context,
-                          icon: Icons.trending_up,
-                          label: 'Promedio',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const PromedioVentaScreen(),
-                              ),
-                            ).then((_) => _loadDashboard());
-                          },
-                        ),
-                        _buildTopButton(
-                          context,
-                          icon: Icons.warning_amber_rounded,
-                          label: 'Alertas',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AlertsScreen(),
-                              ),
-                            ).then((_) => _loadDashboard());
-                          },
-                        ),
-                      ],
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadDashboard,
+                      child: const Text('Reintentar'),
                     ),
+                  ],
+                ),
+              )
+              : RefreshIndicator(
+                onRefresh: _loadDashboard,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildWelcomePanel(context, isMobile),
+                      const SizedBox(height: 24),
 
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Crecimiento Mensual'),
-                  Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    height: 260,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.purple.shade100.withOpacity(0.3),
-                          blurRadius: 6,
-                          offset: const Offset(2, 3),
+                      // 🟦 MENÚ HORIZONTAL DEL DUEÑO
+                      Container(
+                        margin: const EdgeInsets.only(top: 8, bottom: 20),
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF311B92),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.deepPurple.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: CrecimientoMensualChart(datos: data.crecimiento),
-                  ),
-
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Productos más Rentables'),
-                  _buildRentablesPreview(context, data.productosRentables),
-
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Ventas por Empleado'),
-                  _buildPlaceholder(
-                    '👩‍💼 ${data.ventasPorEmpleado.length} empleados',
-                  ),
-
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Distribución de Inventario'),
-                  data.distribucionInventario.isEmpty
-                      ? _buildPlaceholder('🥧 Sin datos de inventario')
-                      : _buildDistribucionInventario(
-                        context,
-                        data.distribucionInventario,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          children: [
+                            _buildTopButton(
+                              context,
+                              icon: Icons.receipt_long_outlined,
+                              label: 'Ventas',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const VentasScreen(),
+                                  ),
+                                ).then((_) => _loadDashboard());
+                              },
+                            ),
+                            _buildTopButton(
+                              context,
+                              icon: Icons.account_balance_wallet_outlined,
+                              label: 'IVA',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const IvaRecaudadoScreen(),
+                                  ),
+                                ).then((_) => _loadDashboard());
+                              },
+                            ),
+                            _buildTopButton(
+                              context,
+                              icon: Icons.trending_up,
+                              label: 'Promedio',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PromedioVentaScreen(),
+                                  ),
+                                ).then((_) => _loadDashboard());
+                              },
+                            ),
+                            _buildTopButton(
+                              context,
+                              icon: Icons.warning_amber_rounded,
+                              label: 'Alertas',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AlertsScreen(),
+                                  ),
+                                ).then((_) => _loadDashboard());
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
 
-      // 💬 Chatbot flotante agregado sin alterar la lógica existente
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Crecimiento Mensual'),
+                      Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        height: 260,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.purple.shade100.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(2, 3),
+                            ),
+                          ],
+                        ),
+                        child: CrecimientoMensualChart(
+                          datos: _dashboardData!.crecimiento,
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Productos más Rentables'),
+                      _buildRentablesPreview(
+                        context,
+                        _dashboardData!.productosRentables,
+                      ),
+
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Ventas por Empleado'),
+                      _buildPlaceholder(
+                        '👩‍💼 ${_dashboardData!.ventasPorEmpleado.length} empleados',
+                      ),
+
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Distribución de Inventario'),
+                      _dashboardData!.distribucionInventario.isEmpty
+                          ? _buildPlaceholder('🥧 Sin datos de inventario')
+                          : _buildDistribucionInventario(
+                            context,
+                            _dashboardData!.distribucionInventario,
+                          ),
+                    ],
+                  ),
+                ),
+              ),
+
+      // 💬 Chatbot flotante
       floatingActionButton: FloatingActionButton(
         heroTag: 'chatbot_dueno',
         backgroundColor: const Color(0xFF6A1B9A),

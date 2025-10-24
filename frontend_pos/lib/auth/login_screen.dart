@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_fonts/google_fonts.dart'; // Importar google_fonts
 import 'auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -388,11 +389,11 @@ class _RoleChip extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: GoogleFonts.notoSans( // ✅ Usar Noto Sans para mejor soporte de caracteres
           color: Color(0xFF3E2C74),
           fontWeight: FontWeight.w800,
           letterSpacing: 0.2,
-        ),
+        ), // ✅ Fin de GoogleFonts.notoSans
       ),
     );
   }

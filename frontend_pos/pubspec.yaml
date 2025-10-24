@@ -17,6 +17,7 @@ dependencies:
   google_mlkit_barcode_scanning: ^0.6.0  # Versión compatible
   
   # El resto de tus dependencias
+  google_fonts: ^6.0.0
   mobile_scanner: ^7.1.2
   path_provider: ^2.1.1
   cupertino_icons: ^1.0.8
