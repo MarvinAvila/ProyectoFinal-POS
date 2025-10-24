@@ -113,26 +113,64 @@ class VentaItem {
 class VentasRepository {
   final ApiClient _api = ApiClient(); // ✅ Declarar correctamente
 
-  // ✅ MÉTODO createVenta DENTRO de la clase
+  // ✅ MÉTODO createVenta ACTUALIZADO - Usando el nuevo postFullResponse
   Future<Map<String, dynamic>> createVenta(Map<String, dynamic> payload) async {
     try {
-      // ignore: avoid_print
       print('📦 [VentasRepository] Enviando payload: $payload');
 
-      final data = await _api.post(Endpoints.ventas, data: payload);
-      final response = (data is Map) ? Map<String, dynamic>.from(data) : {'ok': true};
+      // ✅ USAR EL MÉTODO POST NORMAL (no postFullResponse)
+      // El método post normal ya maneja el parsing correctamente
+      final response = await _api.post(Endpoints.ventas, data: payload);
 
-      // ignore: avoid_print
-      print('✅ [VentasRepository] Respuesta del backend: $response');
-      return response;
+      print('✅ [VentasRepository] Respuesta recibida: $response');
+
+      // ✅ ADAPTAR LA RESPUESTA A FORMATO ESTÁNDAR
+      if (response is Map<String, dynamic>) {
+        // Si la respuesta ya es un mapa, verificar estructura
+        if (response.containsKey('success')) {
+          return response;
+        } else {
+          // Si no tiene 'success', asumir que fue exitosa
+          return {
+            'success': true,
+            'data': response,
+            'message': 'Venta creada exitosamente',
+          };
+        }
+      } else {
+        // Si es otro tipo de dato, envolverlo
+        return {
+          'success': true,
+          'data': response,
+          'message': 'Venta creada exitosamente',
+        };
+      }
     } on ApiError catch (e) {
-      // ignore: avoid_print
-      print('❌ [VentasRepository] Error API: ${e.message}');
-      rethrow;
+      print('❌ [VentasRepository] Error API: ${e.status} - ${e.message}');
+
+      // ✅ MANEJO ESPECÍFICO DEL ERROR 401
+      if (e.status == 401) {
+        // Limpiar token expirado
+        await ApiClient.setToken(null);
+        throw ApiError(
+          status: 401,
+          message: 'Sesión expirada. Por favor inicie sesión nuevamente.',
+          data: e.data,
+        );
+      }
+
+      // Para otros errores, crear respuesta estructurada
+      throw ApiError(
+        status: e.status,
+        message: e.message,
+        data: {'success': false, 'error': e.message, 'data': e.data},
+      );
     } catch (e) {
-      // ignore: avoid_print
       print('❌ [VentasRepository] Error inesperado: $e');
-      rethrow;
+      throw ApiError(
+        message: 'Error inesperado: $e',
+        data: {'success': false, 'error': 'Error inesperado: $e'},
+      );
     }
   }
 
@@ -200,11 +238,7 @@ class VentasRepository {
     try {
       data = await _api.get(
         Endpoints.detalleVenta,
-        query: {
-          'ventaId': ventaId,
-          'id_venta': ventaId,
-          'venta': ventaId,
-        },
+        query: {'ventaId': ventaId, 'id_venta': ventaId, 'venta': ventaId},
       );
     } catch (_) {}
 

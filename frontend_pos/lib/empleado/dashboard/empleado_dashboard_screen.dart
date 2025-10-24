@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:frontend_pos/empleado/carrito/cart_controller.dart';
 import 'package:frontend_pos/core/http.dart';
 import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart';
@@ -33,6 +34,9 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     if (!kIsWeb) {
       _cameraController = MobileScannerController();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _debugAuthStatus('AL INICIAR PANTALLA');
+    });
   }
 
   @override
@@ -94,9 +98,12 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     if (cart.lines.isEmpty || cart.loading) return;
 
     try {
-      // ✅ OBTENER EL ID DEL USUARIO ACTUAL (ahora siempre retorna int)
-      final currentUserId = await _getCurrentUserId(context);
+      // ✅ DEBUG: Estado ANTES del checkout
+      await _debugAuthStatus('ANTES DEL CHECKOUT');
+      _debugSetTokenCalls();
 
+      // ✅ OBTENER EL ID DEL USUARIO ACTUAL
+      final currentUserId = await _getCurrentUserId(context);
       print('🎯 [EmpleadoDashboard] ID para venta: $currentUserId');
 
       // ✅ MOSTRAR DIÁLOGO DE CONFIRMACIÓN
@@ -135,11 +142,17 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
 
       if (confirm != true) return;
 
+      // ✅ DEBUG: Estado JUSTO ANTES de llamar al checkout
+      await _debugAuthStatus('JUSTO ANTES DE CHECKOUT');
+
       // ✅ CREAR LA VENTA
       final result = await cart.checkout(
         formaPago: 'efectivo',
-        idUsuario: currentUserId, // ✅ Ahora es int, no int?
+        idUsuario: currentUserId,
       );
+
+      // ✅ DEBUG: Estado INMEDIATAMENTE DESPUÉS del checkout
+      await _debugAuthStatus('INMEDIATAMENTE DESPUÉS DE CHECKOUT');
 
       if (!mounted) return;
 
@@ -158,10 +171,11 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
           ),
         );
 
-        // Cerrar modal si está abierto
-        if (Navigator.canPop(context)) {
-          Navigator.pop(context);
-        }
+        // ✅ DEBUG: Estado después de mostrar el mensaje de éxito
+        await _debugAuthStatus('DESPUÉS DE MENSAJE ÉXITO');
+
+        // ✅ DEBUG: Estado final
+        await _debugAuthStatus('FINAL');
       } else {
         final errorMsg =
             cart.error ?? result?['message'] ?? 'Error desconocido';
@@ -189,6 +203,36 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
         ),
       );
     }
+  }
+
+  // Agrega estos métodos en tu _EmpleadoDashboardScreenState
+
+  // ✅ DEBUG: Verificar estado completo de autenticación
+  Future<void> _debugAuthStatus(String stage) async {
+    print('\n🔍 === DEBUG AUTH STATUS - $stage ===');
+
+    // Verificar token
+    final token = await ApiClient.getToken();
+    print(
+      '🔐 Token: ${token != null ? "PRESENTE (${token.length} chars)" : "AUSENTE"}',
+    );
+
+    // Verificar datos de usuario
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('current_user_id');
+    final userName = prefs.getString('current_user_name');
+    final userRole = prefs.getString('current_user_role');
+
+    print('👤 User ID: $userId');
+    print('👤 User Name: $userName');
+    print('👤 User Role: $userRole');
+    print('🔍 === FIN DEBUG ===\n');
+  }
+
+  // ✅ DEBUG: Verificar si hay llamadas a setToken
+  void _debugSetTokenCalls() {
+    print('🎯 [Dashboard] Monitoreando llamadas a setToken...');
+    // Esto nos ayudará a identificar si algo está limpiando el token
   }
 
   // ✅ MÉTODO PARA OBTENER EL ID DEL USUARIO ACTUAL

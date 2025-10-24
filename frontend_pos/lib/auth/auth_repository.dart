@@ -209,6 +209,9 @@ class AuthRepository {
   Future<bool> isAuthenticated() async {
     final token = await ApiClient.getToken();
     return token != null && token.isNotEmpty;
+    final authenticated = token != null && token.isNotEmpty;
+    print('🔑 [AuthRepository] isAuthenticated() check: Token present = $authenticated');
+    return authenticated;
   }
 
   Future<Map<String, dynamic>> fetchPerfil() async {

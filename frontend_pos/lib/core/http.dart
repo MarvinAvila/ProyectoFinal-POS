@@ -18,7 +18,7 @@ class ApiError implements Exception {
   String toString() => 'ApiError(status: $status, message: $message)';
 }
 
-/// Cliente HTTP (Dio) centralizado con Bearer Token y baseUrl = Env.apiRoot
+/// Cliente HTTP (Dio) centralizado con Bearer Token and baseUrl = Env.apiRoot
 class ApiClient {
   static final ApiClient _i = ApiClient._internal();
   factory ApiClient() => _i;
@@ -128,6 +128,46 @@ class ApiClient {
     } on DioException catch (e) {
       if (e.response != null) {
         return _parse(e.response!);
+      }
+      throw ApiError(
+        status: e.response?.statusCode,
+        message: e.message ?? 'Error de conexión',
+        data: e.response?.data,
+      );
+    }
+  }
+
+  // ✅ AGREGAR ESTE MÉTODO DENTRO DE LA CLASE
+  Future<dynamic> postFullResponse(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? query,
+    Map<String, dynamic>? headers,
+  }) async {
+    try {
+      final res = await _dio.post(
+        path,
+        data: data,
+        queryParameters: query,
+        options: Options(headers: headers),
+      );
+
+      // ✅ PARA ESTE MÉTODO ESPECÍFICO: Devolver respuesta completa
+      return res.data; // ← Devuelve todo el JSON, no solo 'data'
+    } on DioException catch (e) {
+      if (e.response != null) {
+        // Mantener el mismo manejo de errores
+        final status = e.response!.statusCode ?? 500;
+        final body = e.response!.data;
+
+        String message = 'Error $status';
+        if (body is Map) {
+          message = (body['message'] ?? body['error'] ?? message).toString();
+        } else if (body is String && body.isNotEmpty) {
+          message = body;
+        }
+
+        throw ApiError(status: status, message: message, data: body);
       }
       throw ApiError(
         status: e.response?.statusCode,

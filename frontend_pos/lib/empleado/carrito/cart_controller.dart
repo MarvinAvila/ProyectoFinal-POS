@@ -1,10 +1,11 @@
 // lib/carrito/cart_controller.dart
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:frontend_pos/core/http.dart';
+import 'package:frontend_pos/core/http.dart'; // ✅ Importar para poder usar ApiError
 import 'package:frontend_pos/admin/productos/product_model.dart';
 import 'package:frontend_pos/admin/productos/product_repository.dart';
-import 'package:frontend_pos/admin/ventas/ventas_repository.dart';
+import 'package:frontend_pos/empleado/ventas/ventas_repository.dart';
+import 'package:frontend_pos/utils/jwt_utils.dart';
 
 /// ====== MODELOS ======
 
@@ -103,6 +104,29 @@ class CartController extends ChangeNotifier {
 
   double get iva => (itemsSubtotal * ivaRate);
   double get total => itemsSubtotal + iva;
+
+  Future<bool> _verifyToken() async {
+    try {
+      final token = await ApiClient.getToken();
+      if (token == null || token.isEmpty) {
+        _error = 'Sesión expirada. Por favor inicie sesión nuevamente.';
+        return false;
+      }
+
+      // Verificar si el token está expirado
+      final isExpired = JwtUtils.isTokenExpired(token);
+      if (isExpired) {
+        _error = 'Sesión expirada. Por favor inicie sesión nuevamente.';
+        await ApiClient.setToken(null); // Limpiar token expirado
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      _error = 'Error verificando sesión: $e';
+      return false;
+    }
+  }
 
   Future<void> init() async {}
 
@@ -227,22 +251,29 @@ class CartController extends ChangeNotifier {
   }
 
   /// Finaliza la venta
+  // En tu CartController - método checkout actualizado
   Future<Map<String, dynamic>?> checkout({
     required String formaPago,
-    required int idUsuario, // ✅ Ahora es requerido
+    required int idUsuario,
   }) async {
     if (_lines.isEmpty) return null;
+
+    // ✅ VERIFICAR TOKEN ANTES DE PROCEDER
+    final token = await ApiClient.getToken();
+    if (token == null || token.isEmpty) {
+      _error = 'No hay sesión activa. Por favor inicie sesión.';
+      _loading = false;
+      notifyListeners();
+      return {'success': false, 'message': _error, 'requiresLogin': true};
+    }
 
     _loading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // ✅ PREPARAR PAYLOAD EXACTO como espera el backend
-      print('🔍 Verificando ID usuario: $idUsuario');
-      print('🔍 Tipo de ID: ${idUsuario.runtimeType}');
       final payload = {
-        'id_usuario': idUsuario, // ✅ Este debe ser 4, no 1
+        'id_usuario': idUsuario,
         'forma_pago': formaPago,
         'detalles':
             _lines
@@ -256,37 +287,57 @@ class CartController extends ChangeNotifier {
                 .toList(),
       };
 
-      print('🛒 [CartController] Enviando venta:');
-      print('   ID Usuario: $idUsuario');
-      print('   Forma pago: $formaPago');
-      print('   Detalles: ${payload['detalles']}');
+      print('🛒 [CartController] Enviando venta...');
 
-      print('🛒 [CartController] Enviando venta con usuario ID: $idUsuario');
-      print('📦 Payload completo: $payload');
-      // ✅ ENVIAR VENTA AL BACKEND usando el nuevo método
+      // ✅ LLAMAR AL REPOSITORIO ACTUALIZADO
       final response = await _ventasRepo.createVenta(payload);
 
-      // ✅ VERIFICAR RESPUESTA EXITOSA
-      if (response['success'] == true) {
-        // ✅ LIMPIAR CARRITO SI TODO SALE BIEN
-        _lines.clear();
+      // ✅ PROCESAR RESPUESTA
+      final success = response['success'] == true;
+      final message = response['message'] ?? response['error'];
 
-        print(
-          '✅ [CartController] Venta creada exitosamente: ${response['data']?['id_venta']}',
-        );
-        return response;
+      if (success) {
+        // ✅ VENTA EXITOSA
+        _lines.clear();
+        print('✅ [CartController] Venta creada exitosamente');
+
+        return {
+          'success': true,
+          'message': message ?? 'Venta realizada con éxito',
+          'data': response['data'] ?? {},
+          'ventaId': response['data']?['id_venta'] ?? response['data']?['id'],
+        };
       } else {
-        _error = response['message'] ?? 'Error desconocido del servidor';
-        return null;
+        // ❌ ERROR DEL SERVIDOR
+        _error = message ?? 'Error al procesar la venta';
+        print('❌ [CartController] Error del servidor: $_error');
+
+        return {
+          'success': false,
+          'message': _error,
+          'data': response,
+          'requiresLogin': message?.contains('sesión') ?? false,
+        };
       }
     } on ApiError catch (e) {
-      _error = 'Error al crear venta: ${e.message}';
-      print('❌ [CartController] Error en checkout: ${e.message}');
-      return null;
+      // ✅ MANEJO ESPECÍFICO DE ERRORES
+      if (e.status == 401) {
+        _error = 'Sesión expirada. Por favor inicie sesión nuevamente.';
+        await ApiClient.setToken(null);
+        print('🔐 [CartController] Token expirado - Limpiando sesión');
+
+        return {'success': false, 'message': _error, 'requiresLogin': true};
+      } else {
+        _error = 'Error: ${e.message}';
+        print('❌ [CartController] ApiError: ${e.message}');
+
+        return {'success': false, 'message': _error, 'requiresLogin': false};
+      }
     } catch (e) {
       _error = 'Error inesperado: $e';
       print('❌ [CartController] Error inesperado: $e');
-      return null;
+
+      return {'success': false, 'message': _error, 'requiresLogin': false};
     } finally {
       _loading = false;
       notifyListeners();

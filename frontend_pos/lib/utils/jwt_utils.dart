@@ -44,4 +44,27 @@ class JwtUtils {
     final payload = decodeToken(token);
     return payload?['nombre'] as String?;
   }
+
+  static bool isTokenExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+
+      final payload = parts[1];
+      // Padding para base64
+      var normalized = base64.normalize(payload);
+      // Decodificar
+      final decoded = utf8.decode(base64.decode(normalized));
+      final payloadMap = json.decode(decoded);
+
+      final exp = payloadMap['exp'];
+      if (exp is int) {
+        final expiry = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+        return DateTime.now().isAfter(expiry);
+      }
+      return true;
+    } catch (e) {
+      return true; // Si hay error, considerar como expirado
+    }
+  }
 }

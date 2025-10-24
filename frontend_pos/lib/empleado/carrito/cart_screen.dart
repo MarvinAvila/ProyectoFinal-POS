@@ -136,8 +136,6 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  // EN cart_screen.dart - ACTUALIZAR EL BOTÓN DE FINALIZAR VENTA
-
   Widget _buildResumen(
     BuildContext context,
     CartController cart,
@@ -158,7 +156,17 @@ class CartScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ... (tus widgets existentes de resumen)
+          _buildLineaResumen('Subtotal:', currency.format(cart.itemsSubtotal)),
+          _buildLineaResumen(
+            'IVA (${(cart.ivaRate * 100).toInt()}%):',
+            currency.format(cart.iva),
+          ),
+          const Divider(),
+          _buildLineaResumen(
+            'TOTAL:',
+            currency.format(cart.total),
+            isTotal: true,
+          ),
           const SizedBox(height: 8),
           ElevatedButton.icon(
             onPressed:
@@ -178,9 +186,39 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  // ✅ NUEVO MÉTODO PARA FINALIZAR VENTA
+  Widget _buildLineaResumen(
+    String label,
+    String value, {
+    bool isTotal = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              fontSize: isTotal ? 16 : 14,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              fontSize: isTotal ? 16 : 14,
+              color: isTotal ? Colors.deepPurple : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ MÉTODO ACTUALIZADO PARA FINALIZAR VENTA
   void _finalizarVenta(BuildContext context, CartController cart) async {
-    // Mostrar loading
+    // Mostrar loading inicial
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -190,7 +228,7 @@ class CartScreen extends StatelessWidget {
               children: [
                 CircularProgressIndicator(),
                 SizedBox(width: 16),
-                Text('Procesando venta...'),
+                Text('Preparando venta...'),
               ],
             ),
           ),
@@ -203,12 +241,7 @@ class CartScreen extends StatelessWidget {
       if (idUsuario == null) {
         if (!context.mounted) return;
         Navigator.pop(context); // Cerrar loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Error: No se pudo identificar al usuario'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _mostrarError(context, 'No se pudo identificar al usuario');
         return;
       }
 
@@ -219,7 +252,7 @@ class CartScreen extends StatelessWidget {
       final formaPago = await _mostrarSelectorPago(context);
       if (formaPago == null) return; // Usuario canceló
 
-      // 🔹 MOSTRAR LOADING DE NUEVO PARA LA VENTA
+      // 🔹 MOSTRAR LOADING PARA LA VENTA
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -244,52 +277,90 @@ class CartScreen extends StatelessWidget {
       if (!context.mounted) return;
       Navigator.pop(context); // Cerrar loading
 
+      // ✅ MANEJO MEJORADO DE LA RESPUESTA
       if (result != null && result['success'] == true) {
-        final ventaData = result['data'];
-        final idVenta = ventaData?['id_venta'];
-        final total = ventaData?['total'];
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Venta #$idVenta registrada - Total: \$$total'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-
-        // Opcional: Navegar a comprobante o limpiar
-        await Future.delayed(const Duration(seconds: 2));
+        await _manejarVentaExitosa(context, result);
       } else {
-        final errorMsg =
-            cart.error ?? result?['message'] ?? 'Error desconocido';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error: $errorMsg'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        await _manejarErrorVenta(context, result, cart);
       }
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context); // Cerrar loading en caso de error
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error inesperado: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _mostrarError(context, 'Error inesperado: $e');
       }
     }
   }
 
-  // ✅ IMPLEMENTAR OBTENCIÓN DEL ID DEL USUARIO
+  // ✅ MANEJAR VENTA EXITOSA
+  Future<void> _manejarVentaExitosa(
+    BuildContext context,
+    Map<String, dynamic> result,
+  ) async {
+    final ventaData = result['data'] ?? {};
+    final idVenta = ventaData['id_venta'] ?? ventaData['id'];
+    final total = ventaData['total'] ?? result['total'];
+    final message = result['message'] ?? 'Venta registrada exitosamente';
 
-  // EN cart_screen.dart - ACTUALIZAR EL MÉTODO
+    // Mostrar mensaje de éxito
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✅ $message - Total: \$$total'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
 
+    // Esperar un momento y luego navegar al dashboard
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (context.mounted) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/empleado/dashboard',
+        (route) => false,
+      );
+    }
+  }
+
+  // ✅ MANEJAR ERROR EN VENTA
+  Future<void> _manejarErrorVenta(
+    BuildContext context,
+    Map<String, dynamic>? result,
+    CartController cart,
+  ) async {
+    final errorMsg = cart.error ?? result?['message'] ?? 'Error desconocido';
+    final requiresLogin = result?['requiresLogin'] == true;
+
+    if (requiresLogin) {
+      // ✅ ERROR DE AUTENTICACIÓN - Redirigir al login
+      _mostrarError(context, 'Sesión expirada. Redirigiendo al login...');
+
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (context.mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
+    } else {
+      // ✅ OTRO TIPO DE ERROR - Mostrar mensaje y permanecer
+      _mostrarError(context, errorMsg);
+    }
+  }
+
+  // ✅ MOSTRAR ERROR
+  void _mostrarError(BuildContext context, String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('❌ $mensaje'),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  // ✅ OBTENER ID USUARIO (MANTENIENDO TU LÓGICA)
   Future<int?> _obtenerIdUsuarioActual() async {
     try {
-      print('🎯 [CartScreen] SOLUCIÓN TEMPORAL: Forzando ID 4 para cajero');
+      print('🎯 [CartScreen] Obteniendo ID de usuario...');
 
       // 🔹 PRIMERO: Intentar obtener de AuthRepository
       print('🔄 [CartScreen] Intentando desde AuthRepository...');
@@ -320,7 +391,7 @@ class CartScreen extends StatelessWidget {
     }
   }
 
-  // ✅ SELECTOR DE FORMA DE PAGO
+  // ✅ SELECTOR DE FORMA DE PAGO (MANTENIENDO TU LÓGICA)
   Future<String?> _mostrarSelectorPago(BuildContext context) async {
     return await showDialog<String>(
       context: context,
