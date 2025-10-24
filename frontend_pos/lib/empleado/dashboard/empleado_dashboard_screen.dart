@@ -1,10 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:frontend_pos/empleado/carrito/cart_controller.dart';
 import 'package:frontend_pos/core/http.dart';
-import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart'; // 💬 Chatbot importado
+import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart';
 
 class EmpleadoDashboardScreen extends StatefulWidget {
   const EmpleadoDashboardScreen({super.key});
@@ -15,8 +16,8 @@ class EmpleadoDashboardScreen extends StatefulWidget {
 }
 
 class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
-  // ✅ Controlador para la cámara y el campo de texto manual
-  late final MobileScannerController _cameraController;
+  // ✅ Controlador para la cámara - SOLO PARA MÓVIL
+  MobileScannerController? _cameraController;
   final TextEditingController _manualBarcodeController =
       TextEditingController();
   String? _lastScannedBarcode;
@@ -25,12 +26,15 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _cameraController = MobileScannerController();
+    // Solo inicializar cámara si no es web
+    if (!kIsWeb) {
+      _cameraController = MobileScannerController();
+    }
   }
 
   @override
   void dispose() {
-    _cameraController.dispose();
+    _cameraController?.dispose();
     _manualBarcodeController.dispose();
     super.dispose();
   }
@@ -79,9 +83,7 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     final cart = context.read<CartController>();
     if (cart.lines.isEmpty || cart.loading) return;
 
-    // Aquí podrías mostrar un diálogo para seleccionar forma de pago
     try {
-      // ✅ Llamamos al método checkout del controlador del carrito.
       final result = await cart.checkout(formaPago: 'efectivo');
 
       if (!mounted) return;
@@ -93,7 +95,6 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        // Si es un modal sheet, lo cerramos
         if (Navigator.canPop(context)) {
           Navigator.pop(context);
         }
@@ -124,24 +125,24 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
       appBar: AppBar(
         title: const Text('Punto de Venta'),
         backgroundColor: Colors.deepPurple,
-        actions: [
-          // Botón para alternar la cámara
-          IconButton(
-            icon: ValueListenableBuilder<TorchState>(
-              valueListenable: _cameraController.torchState,
-              builder: (context, state, child) {
-                return Icon(
-                  state == TorchState.on ? Icons.flash_on : Icons.flash_off,
-                );
-              },
-            ),
-            onPressed: () => _cameraController.toggleTorch(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.flip_camera_ios),
-            onPressed: () => _cameraController.switchCamera(),
-          ),
-        ],
+        actions:
+            kIsWeb
+                ? [] // En web, sin controles de cámara
+                : [
+                  // En móvil, controles simplificados sin torchState
+                  IconButton(
+                    icon: const Icon(Icons.flash_on),
+                    onPressed: () {
+                      _cameraController?.toggleTorch();
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.flip_camera_ios),
+                    onPressed: () {
+                      _cameraController?.switchCamera();
+                    },
+                  ),
+                ],
       ),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,10 +206,8 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
                     ),
                   ),
                   builder:
-                      (_) => const SizedBox(
-                        height: 600,
-                        child: ChatbotScreen(), // ✅ Chatbot modal
-                      ),
+                      (_) =>
+                          const SizedBox(height: 600, child: ChatbotScreen()),
                 );
               },
             ),
@@ -218,16 +217,83 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     );
   }
 
-  // ✅ Widget para la vista de la cámara
+  // ✅ Widget para la vista de la cámara MULTIPLATAFORMA
   Widget _buildScanner() {
+    if (kIsWeb) {
+      return _buildWebScannerFallback();
+    }
+
+    if (_cameraController == null) {
+      return Container(
+        color: Colors.black,
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Colors.white),
+              SizedBox(height: 16),
+              Text(
+                'Inicializando cámara...',
+                style: TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return MobileScanner(
-      controller: _cameraController,
+      controller: _cameraController!,
       onDetect: (capture) {
         final barcode = capture.barcodes.firstOrNull;
         if (barcode?.rawValue != null) {
           _processBarcode(barcode!.rawValue!);
         }
       },
+    );
+  }
+
+  Widget _buildWebScannerFallback() {
+    return Container(
+      color: Colors.grey[900],
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.qr_code_scanner, size: 80, color: Colors.white),
+            const SizedBox(height: 20),
+            const Text(
+              'Escáner de Códigos de Barras',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Usa la entrada manual para agregar productos\n\nEn dispositivos móviles se activará la cámara automáticamente',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'En versión móvil se activa el escáner de cámara',
+                    ),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Modo Cámara (Móvil)'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -339,7 +405,6 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
             ),
           ),
           const Divider(),
-          // Aquí podrías agregar Subtotal, IVA y Total si quieres más detalle
           Text('Subtotal: ${currency.format(cart.itemsSubtotal)}'),
           Text('IVA (16%): ${currency.format(cart.iva)}'),
           Text(

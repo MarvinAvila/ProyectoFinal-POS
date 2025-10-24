@@ -5,16 +5,18 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.2
+  sdk: '>=3.7.2 <4.0.0'  # Cambiado para mejor compatibilidad
 
 dependencies:
   flutter:
     sdk: flutter
 
-  # 👇 Aquí va shared_preferences fuera del bloque flutter
+  # Dependencias principales
   shared_preferences: ^2.2.2
-
-  # The following adds the Cupertino Icons font to your application.
+  camera: ^0.10.5+1  # Versión compatible
+  google_mlkit_barcode_scanning: ^0.6.0  # Versión compatible
+  
+  # El resto de tus dependencias
   mobile_scanner: ^7.1.2
   path_provider: ^2.1.1
   cupertino_icons: ^1.0.8
