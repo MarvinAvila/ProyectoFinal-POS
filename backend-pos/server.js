@@ -325,6 +325,105 @@ app.post("/api/admin/update-barcode-fields", async (req, res) => {
   }
 });
 
+// ✅ NUEVO: Endpoint para actualizar tabla de alertas
+app.post("/api/admin/update-alertas-table", async (req, res) => {
+  console.log("🔄 Solicitada actualización de tabla alertas...");
+
+  const db = require("./src/config/database");
+  const client = await db.getClient();
+
+  try {
+    await client.query("BEGIN");
+
+    console.log("\n📋 EJECUTANDO ACTUALIZACIONES EN TABLA ALERTAS:");
+
+    // 1. Agregar columna fecha_atendida si no existe
+    console.log("1. ➕ Agregando columna fecha_atendida...");
+    await client.query(`
+      ALTER TABLE alertas 
+      ADD COLUMN IF NOT EXISTS fecha_atendida TIMESTAMP DEFAULT NULL
+    `);
+
+    // 2. Actualizar alertas existentes que están atendidas pero sin fecha
+    console.log("2. 🔄 Actualizando alertas atendidas existentes...");
+    const updateResult = await client.query(`
+      UPDATE alertas 
+      SET fecha_atendida = NOW() 
+      WHERE atendida = TRUE AND fecha_atendida IS NULL
+    `);
+    console.log(`   ✅ ${updateResult.rowCount} alertas actualizadas`);
+
+    // 3. Crear índice para mejor rendimiento
+    console.log("3. 🗂️ Creando índices para alertas...");
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_alertas_atendida ON alertas(atendida);
+      CREATE INDEX IF NOT EXISTS idx_alertas_fecha ON alertas(fecha);
+      CREATE INDEX IF NOT EXISTS idx_alertas_tipo ON alertas(tipo);
+      CREATE INDEX IF NOT EXISTS idx_alertas_producto ON alertas(id_producto);
+    `);
+
+    // 4. Verificar cambios
+    console.log("4. ✅ Verificando cambios...");
+    const verification = await client.query(`
+      SELECT 
+        column_name,
+        data_type,
+        is_nullable,
+        column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'alertas' 
+      AND column_name = 'fecha_atendida'
+    `);
+
+    // 5. Contar alertas por estado
+    const statsResult = await client.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE atendida = TRUE) as atendidas,
+        COUNT(*) FILTER (WHERE atendida = FALSE) as pendientes
+      FROM alertas
+    `);
+
+    await client.query("COMMIT");
+
+    console.log("\n🎉 ACTUALIZACIÓN DE ALERTAS COMPLETADA EXITOSAMENTE!");
+
+    res.json({
+      success: true,
+      message: "Tabla de alertas actualizada correctamente",
+      detalles: {
+        columna_agregada:
+          verification.rows.length > 0
+            ? {
+                nombre: verification.rows[0].column_name,
+                tipo: verification.rows[0].data_type,
+                nullable: verification.rows[0].is_nullable === "YES",
+                default: verification.rows[0].column_default,
+              }
+            : null,
+        estadisticas: {
+          total_alertas: parseInt(statsResult.rows[0].total),
+          alertas_atendidas: parseInt(statsResult.rows[0].atendidas),
+          alertas_pendientes: parseInt(statsResult.rows[0].pendientes),
+        },
+        estado: "COMPLETADO",
+      },
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("\n❌ ERROR durante la actualización:", error.message);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      codigo: error.code,
+      mensaje: "Error actualizando tabla de alertas",
+    });
+  } finally {
+    client.release();
+  }
+});
+
 // Manejo de errores 404
 app.use("*", (req, res) => {
   res.status(404).json({
