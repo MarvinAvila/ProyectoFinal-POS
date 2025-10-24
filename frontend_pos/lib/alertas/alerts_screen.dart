@@ -35,11 +35,38 @@ class AlertsController extends ChangeNotifier {
 
     try {
       // El backend ya debe filtrar solo las alertas vigentes (stock bajo actual)
-      final data = await _api.get(Endpoints.alertas);
-      final list = asList(asMap(data)['alertas']);
+      // 🔹 Usamos el endpoint de pendientes para enfocarnos en lo accionable
+      final data = await _api.get(Endpoints.alertasPendientes);
+      // ✅ FIX: Dividir la expresión para evitar confusión del linter
+      final rawResponse = asMap(data);
+      final rawAlertsList = rawResponse['alertas'];
+      final list = asList(rawAlertsList);
       _items = list.map((e) => AlertItem.fromJson(asMap(e))).toList();
     } on ApiError catch (e) {
       _error = e.toString();
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// ✅ Marcar una alerta como atendida
+  Future<bool> marcarAtendida(int id) async {
+    _loading = true;
+    notifyListeners();
+
+    try {
+      // ✅ FIX: El segundo argumento 'data' debe ser nombrado.
+      await _api.patch(
+        '${Endpoints.alertas}/$id/atendida',
+        data: {},
+      );
+      // Quitar la alerta de la lista local para que la UI se actualice al instante
+      _items.removeWhere((item) => item.id == id);
+      return true;
+    } on ApiError catch (e) {
+      _error = 'Error al marcar como atendida: ${e.message}';
+      return false;
     } finally {
       _loading = false;
       notifyListeners();
@@ -148,21 +175,40 @@ class _AlertsViewState extends State<_AlertsView> {
               final isCad = a.type == AlertType.caducidad;
               final leadingIcon = isCad ? Icons.timer_outlined : Icons.warning;
 
-              return Card(
-                child: ListTile(
-                  leading: Icon(
-                    leadingIcon,
-                    color: isCad ? Colors.orange : Colors.redAccent,
-                  ),
-                  title: Text(a.message),
-                  subtitle: Text(
-                    [
-                      alertTypeToText(a.type),
-                      if (a.productName?.isNotEmpty == true)
-                        '• ${a.productName}',
-                      '• ${ctrl.formatDate(a.date)}',
-                      if (a.productId != null) '• Prod #${a.productId}',
-                    ].join(' '),
+              return Opacity(
+                opacity: a.attended ? 0.5 : 1.0,
+                child: Card(
+                  elevation: a.attended ? 1 : 3,
+                  child: ListTile(
+                    leading: Icon(
+                      leadingIcon,
+                      color: isCad ? Colors.orange : Colors.redAccent,
+                    ),
+                    title: Text(a.message),
+                    subtitle: Text(
+                      [
+                        alertTypeToText(a.type),
+                        if (a.productName?.isNotEmpty == true)
+                          '• ${a.productName}',
+                        '• ${ctrl.formatDate(a.date)}',
+                        if (a.productId != null) '• Prod #${a.productId}',
+                      ].join(' '),
+                    ),
+                    // ✅ Botón para marcar como atendida
+                    trailing: a.attended
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : TextButton(
+                            onPressed: () async {
+                              final success = await ctrl.marcarAtendida(a.id);
+                              if (success) {
+                                // ✅ FIX: Verificar context.mounted explícitamente después de await
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Alerta atendida')));
+                              }
+                            },
+                            child: const Text('Atender'),
+                          ),
                   ),
                 ),
               );

@@ -39,6 +39,7 @@ class Endpoints {
   static const proveedores = '/proveedores';
   static const categorias = '/categorias';
   static const alertas = '/alertas';
+  static const alertasPendientes = '/alertas/pendientes'; // ✅ Endpoint agregado
   static const inventario = '/inventario';
   static const ofertas = '/ofertas';
   static const productoOferta = '/producto-oferta';

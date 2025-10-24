@@ -218,8 +218,10 @@ const alertaController = {
             const alertaActualizada = Alerta.fromDatabaseRow(result.rows[0]);
             alertaActualizada.producto_nombre = alerta.producto_nombre;
 
-            logger.audit("Alerta marcada como atendida", req.user?.id_usuario, "UPDATE", {
+            // ✅ FIX: La llamada a logger.audit debe tener 3 argumentos, no 4.
+            logger.audit("Alerta marcada como atendida", req.user?.id_usuario, {
                 alertaId: id,
+                action: "UPDATE", // Se puede incluir la acción dentro de los detalles
                 tipo: alerta.tipo,
                 producto: alerta.producto_nombre
             });
