@@ -38,16 +38,23 @@ const alertaController = {
             );
             const total = countRes.rows[0].total;
 
-            // Obtener datos con información de producto
-            const result = await client.query(
-                `SELECT a.*, p.nombre as producto_nombre, p.codigo_barra, p.stock, p.fecha_caducidad
-                 FROM alertas a
-                 JOIN productos p ON a.id_producto = p.id_producto
-                 ${whereSQL}
-                 ORDER BY a.fecha DESC
-                 LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-                params
-            );
+            // Obtener datos con información de producto       ---------- ------------------------alertas aqui mero le movi 
+           const result = await client.query(
+  `SELECT a.*, p.nombre AS producto_nombre, p.codigo_barra, p.stock, p.fecha_caducidad
+   FROM alertas a
+   JOIN productos p ON a.id_producto = p.id_producto
+   ${whereSQL}
+   -- 🔹 Solo mostrar alertas aún válidas
+   AND (
+     (a.tipo = 'stock_bajo' AND p.stock <= 5)
+     OR (a.tipo = 'caducidad' AND p.fecha_caducidad <= CURRENT_DATE + INTERVAL '7 days')
+     OR (a.tipo NOT IN ('stock_bajo', 'caducidad'))
+   )
+   ORDER BY a.fecha DESC
+   LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+  params
+);
+//---------------------------------
 
             const alertas = result.rows.map(row => Alerta.fromDatabaseRow(row));
             const estadisticas = Alerta.calcularEstadisticas(alertas);
