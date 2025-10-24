@@ -222,12 +222,6 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
                       ),
 
                       const SizedBox(height: 24),
-                      _buildSectionTitle('Ventas por Empleado'),
-                      _buildPlaceholder(
-                        '👩‍💼 ${_dashboardData!.ventasPorEmpleado.length} empleados',
-                      ),
-
-                      const SizedBox(height: 24),
                       _buildSectionTitle('Distribución de Inventario'),
                       _dashboardData!.distribucionInventario.isEmpty
                           ? _buildPlaceholder('🥧 Sin datos de inventario')

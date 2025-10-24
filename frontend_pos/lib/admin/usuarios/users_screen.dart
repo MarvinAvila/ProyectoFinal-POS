@@ -160,16 +160,6 @@ class _UsersView extends StatelessWidget {
                       '${u.correo}\nRol: ${u.rol} • Estado: ${u.activo ? 'Activo' : 'Inactivo'}',
                     ),
                     isThreeLine: true,
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.deepPurple),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Editar ${u.nombre} próximamente'),
-                          ),
-                        );
-                      },
-                    ),
                   ),
                 ),
               );
