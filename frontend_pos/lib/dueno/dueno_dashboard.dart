@@ -64,23 +64,6 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
         backgroundColor: const Color(0xFF4A148C),
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ApiClient.setToken(null);
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Sesión cerrada correctamente'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              Navigator.pushReplacementNamed(context, '/login/dueno');
-            },
-          ),
-        ],
       ),
 
       body:
@@ -197,7 +180,7 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
                       _buildSectionTitle('Crecimiento Mensual'),
                       Container(
                         margin: const EdgeInsets.only(top: 12),
-                        height: 260,
+                        height: 350,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
                           color: Colors.white,
@@ -463,14 +446,8 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
                   style: const TextStyle(color: Colors.green),
                 ),
               ),
-            const Divider(),
-            Text(
-              'Ver todos los productos (${productos.length})',
-              style: const TextStyle(
-                color: Color(0xFF4A148C),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+
+            // const Divider(),
           ],
         ),
       ),
@@ -504,35 +481,74 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            height: 220,
+            height: 320, // un poco más alto para respirar
             child: PieChart(
               PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 45,
+                sectionsSpace: 3, // separación entre porciones
+                centerSpaceRadius: 60, // centro más pequeño
+                startDegreeOffset: -90, // empieza arriba (más simétrico)
                 sections:
-                    distribucionInventario
-                        .map(
-                          (c) => PieChartSectionData(
-                            title: c.categoria,
-                            value: c.valorInventario,
-                            color:
-                                Colors.primaries[distribucionInventario.indexOf(
-                                      c,
-                                    ) %
-                                    Colors.primaries.length],
-                            radius: 80,
-                            titleStyle: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        )
-                        .toList(),
+                    distribucionInventario.map((c) {
+                      final porcentaje = (c.valorInventario / totalValor) * 100;
+
+                      return PieChartSectionData(
+                        title:
+                            porcentaje < 8
+                                ? '' // 🔹 Oculta texto en porciones pequeñas
+                                : '${c.categoria}\n${porcentaje.toStringAsFixed(1)}%',
+                        value: c.valorInventario,
+                        color:
+                            Colors.accents[distribucionInventario.indexOf(c) %
+                                Colors.accents.length],
+                        radius: 100,
+                        titleStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      );
+                    }).toList(),
               ),
             ),
           ),
+
           const SizedBox(height: 16),
+
+          // 🔹 Leyenda personalizada
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 6,
+            children:
+                distribucionInventario.map((c) {
+                  final color =
+                      Colors.accents[distribucionInventario.indexOf(c) %
+                          Colors.accents.length];
+                  final porcentaje = (c.valorInventario / totalValor * 100)
+                      .toStringAsFixed(1);
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        '${c.categoria} ($porcentaje%)',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ],
+                  );
+                }).toList(),
+          ),
+
+          const SizedBox(height: 16),
+
           Text(
             '🥐 ${distribucionInventario.length} categorías analizadas\n💰 Valor total: \$${totalValor.toStringAsFixed(2)}',
             textAlign: TextAlign.center,

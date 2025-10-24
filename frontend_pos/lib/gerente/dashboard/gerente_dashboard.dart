@@ -61,23 +61,6 @@ class _GerenteDashboardScreenState extends State<GerenteDashboard> {
         backgroundColor: const Color(0xFF5D3A9B),
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ApiClient.setToken(null);
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Sesión cerrada correctamente'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              Navigator.pushReplacementNamed(context, '/login/gerente');
-            },
-          ),
-        ],
       ),
 
       body:
