@@ -44,6 +44,33 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# AÑADE ESTAS NUEVAS LÍNEAS:
+
+# Android build intermediates - MÁS ESPECÍFICO
+android/app/build/intermediates/
+android/app/build/generated/
+android/app/build/outputs/
+android/app/src/debug/
+
+# iOS generated files
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+ios/Pods/
+ios/.symlinks/
+
+# macOS generated files
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Flutter/Ephemeral/
+
+# Archivos específicos de Flutter para iOS
+**/Flutter/App.framework/
+**/Flutter/Flutter.framework/
+**/Flutter/Flutter.podspec
+
+# Otros archivos de desarrollo
+.packages
+.flutter-plugins
+
 package-lock.json
 
 # Archivos de seguimiento de proyecto
