@@ -888,9 +888,15 @@ const sql = `
       try {
         // Eliminar códigos antiguos de Cloudinary si existen
         if (productoActual.codigos_public_ids) {
-          const publicIds = Object.values(
-            JSON.parse(productoActual.codigos_public_ids)
-          );
+          let idsParaBorrar;
+          // ✅ CORRECCIÓN: Verificar si ya es un objeto o si es una cadena JSON
+          if (typeof productoActual.codigos_public_ids === 'string') {
+            idsParaBorrar = JSON.parse(productoActual.codigos_public_ids);
+          } else {
+            idsParaBorrar = productoActual.codigos_public_ids; // Ya es un objeto
+          }
+
+          const publicIds = Object.values(idsParaBorrar);
           await BarcodeService.deleteCodesFromCloudinary(publicIds);
         }
 
