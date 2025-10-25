@@ -283,7 +283,17 @@ const productoController = {
 
       // 🆕 GENERAR CÓDIGO DE BARRAS SI NO SE PROPORCIONA
       const codigoBarraFinal =
-        codigo_barra || (await BarcodeGenerator.generateUniqueBarcode());
+        codigo_barra?.trim() ||
+        (await BarcodeGenerator.generateUniqueBarcode());
+
+      if (!codigoBarraFinal || codigoBarraFinal.trim() === "") {
+        await client.query("ROLLBACK");
+        return responseHelper.error(
+          res,
+          "No se pudo generar un código de barras válido",
+          500
+        );
+      }
 
       // Sanitizar entrada
       const productoData = {
@@ -444,7 +454,7 @@ const productoController = {
         stock_inicial: nuevoProducto.stock,
         tiene_imagen: !!nuevoProducto.imagen,
         tiene_codigos: !!codigosGenerados,
-        codigo_generado: !codigo_barra,
+        codigo_generado: !codigo_barra || codigo_barra.trim() === "",
       });
 
       return res.status(201).json({
@@ -500,13 +510,41 @@ const productoController = {
       let codigoBarraCambiado = false;
 
       if (updates.codigo_barra !== undefined) {
-        // Si se proporciona nuevo código, usarlo
-        nuevoCodigoBarra = updates.codigo_barra;
-        codigoBarraCambiado = true;
-      } else if (!productoActual.codigo_barra) {
-        // Si no hay código existente, generar uno nuevo
+        const codigoIngresado = updates.codigo_barra?.trim();
+
+        if (codigoIngresado === "") {
+          // 🎯 CASO: Usuario dejó vacío → Generar automático
+          nuevoCodigoBarra = await BarcodeGenerator.generateUniqueBarcode();
+          codigoBarraCambiado = true;
+          logger.debug("🔄 Código vacío detectado, generando automáticamente", {
+            producto_id: id,
+            codigo_generado: nuevoCodigoBarra,
+          });
+        } else if (
+          codigoIngresado &&
+          codigoIngresado !== productoActual.codigo_barra
+        ) {
+          // 🎯 CASO: Usuario ingresó código nuevo → Validar y usar
+          nuevoCodigoBarra = codigoIngresado;
+          codigoBarraCambiado = true;
+          logger.debug("🔄 Código manual ingresado", {
+            producto_id: id,
+            codigo_anterior: productoActual.codigo_barra,
+            codigo_nuevo: nuevoCodigoBarra,
+          });
+        }
+        // 🎯 CASO: Si es el mismo código → No hacer nada (mantener)
+      } else if (
+        !productoActual.codigo_barra ||
+        productoActual.codigo_barra.trim() === ""
+      ) {
+        // 🎯 CASO: Producto existente sin código → Generar automático
         nuevoCodigoBarra = await BarcodeGenerator.generateUniqueBarcode();
         codigoBarraCambiado = true;
+        logger.debug("🔄 Producto sin código, generando automáticamente", {
+          producto_id: id,
+          codigo_generado: nuevoCodigoBarra,
+        });
       }
 
       // ✅ ELIMINAR CÓDIGOS ANTIGUOS SI EL CÓDIGO DE BARRAS CAMBIA
@@ -969,8 +1007,8 @@ const productoController = {
       // ✅ CORRECCIÓN: Obtener producto con consulta mejorada
       const productoExistente = await client.query(
         `SELECT p.*, 
-              c.nombre as categoria_nombre, 
-              pr.nombre as proveedor_nombre
+            c.nombre as categoria_nombre, 
+            pr.nombre as proveedor_nombre
        FROM productos p
        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
        LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
@@ -983,16 +1021,53 @@ const productoController = {
         return responseHelper.notFound(res, "Producto");
       }
 
-      // ✅ Usar ModelMapper normalmente (debería funcionar)
       const productoRow = productoExistente.rows[0];
       const productoActual = ModelMapper.toProducto(productoRow);
-      const codigoBarra = codigo_barra || productoActual.codigo_barra;
 
-      // Validar nuevo código si se proporciona
-      if (codigoBarra && codigoBarra !== productoActual.codigo_barra) {
+      // 🆕 CORRECCIÓN CRÍTICA: Lógica inteligente para código de barras
+      let codigoBarra;
+
+      if (codigo_barra && codigo_barra.trim() !== "") {
+        // 🎯 CASO 1: Frontend envió código (usuario eligió "Usar Código Ingresado")
+        codigoBarra = codigo_barra.trim();
+        logger.debug("🔄 Usando código proporcionado por usuario", {
+          producto_id: id,
+          codigo: codigoBarra,
+        });
+      } else if (
+        productoActual.codigo_barra &&
+        productoActual.codigo_barra.trim() !== ""
+      ) {
+        // 🎯 CASO 2: No se envió código, pero producto tiene código existente
+        codigoBarra = productoActual.codigo_barra;
+        logger.debug("🔄 Usando código existente del producto", {
+          producto_id: id,
+          codigo: codigoBarra,
+        });
+      } else {
+        // 🎯 CASO 3: No hay código existente ni se envió uno → Generar automático
+        codigoBarra = await BarcodeGenerator.generateUniqueBarcode();
+        logger.debug("🔄 Generando código automáticamente", {
+          producto_id: id,
+          codigo_generado: codigoBarra,
+        });
+      }
+
+      // ✅ VALIDAR que el código no esté vacío después de toda la lógica
+      if (!codigoBarra || codigoBarra.trim() === "") {
+        await client.query("ROLLBACK");
+        return responseHelper.error(
+          res,
+          "No se pudo determinar un código de barras válido",
+          500
+        );
+      }
+
+      // 🆕 CORRECCIÓN: Validar unicidad SOLO si el código es diferente del actual
+      if (codigoBarra !== productoActual.codigo_barra) {
         const codigoExistente = await client.query(
           "SELECT id_producto FROM productos WHERE codigo_barra = $1 AND id_producto != $2",
-          [codigo_barra, id]
+          [codigoBarra, id] // ✅ Usar codigoBarra, no codigo_barra
         );
         if (codigoExistente.rows.length > 0) {
           await client.query("ROLLBACK");
@@ -1069,9 +1144,14 @@ const productoController = {
         unidad: productoData.unidad,
         id_categoria: productoData.id_categoria,
         id_proveedor: productoData.id_proveedor,
-        fecha_creacion: productoData.fecha_creacion, // ✅ Esto debe existir
+        fecha_creacion: productoData.fecha_creacion,
         tiene_fecha_creacion: !!productoData.fecha_creacion,
         campos_totales: Object.keys(productoData).length,
+        codigo_fuente: codigo_barra
+          ? "usuario"
+          : productoActual.codigo_barra
+          ? "existente"
+          : "generado",
       });
 
       let nuevosCodigos = null;
@@ -1122,13 +1202,13 @@ const productoController = {
       // ✅ ACTUALIZAR EN BASE DE DATOS
       const updateResult = await client.query(
         `UPDATE productos SET 
-        codigo_barra = $1,
-        codigo_barras_url = $2,
-        codigo_qr_url = $3,
-        codigos_public_ids = $4,
-        fecha_actualizacion = CURRENT_TIMESTAMP
-      WHERE id_producto = $5
-      RETURNING *`,
+      codigo_barra = $1,
+      codigo_barras_url = $2,
+      codigo_qr_url = $3,
+      codigos_public_ids = $4,
+      fecha_actualizacion = CURRENT_TIMESTAMP
+    WHERE id_producto = $5
+    RETURNING *`,
         [
           codigoBarra,
           nuevosCodigos.barcode_url,
@@ -1156,6 +1236,8 @@ const productoController = {
         producto_id: id,
         nombre: productoActualizado.nombre,
         codigo_cambiado: !!codigo_barra,
+        codigo_generado_automatico:
+          !codigo_barra && !productoActual.codigo_barra,
         nuevos_codigos: true,
       });
 
@@ -1165,6 +1247,11 @@ const productoController = {
           ...productoActualizado,
           codigos_regenerados: true,
           nuevo_codigo_barra: codigoBarra,
+          codigo_fuente: codigo_barra
+            ? "manual"
+            : productoActual.codigo_barra
+            ? "existente"
+            : "automatico",
         },
       });
     } catch (error) {
