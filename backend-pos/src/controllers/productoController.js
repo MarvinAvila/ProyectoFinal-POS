@@ -1024,13 +1024,13 @@ const productoController = {
       const productoRow = productoExistente.rows[0];
       const productoActual = ModelMapper.toProducto(productoRow);
 
-      // 🆕 CORRECCIÓN CRÍTICA: Lógica inteligente para código de barras
+      // 🆕 CORRECCIÓN ESPECÍFICA PARA REGENERATE-CODES
       let codigoBarra;
 
       if (codigo_barra && codigo_barra.trim() !== "") {
-        // 🎯 CASO 1: Frontend envió código (usuario eligió "Usar Código Ingresado")
+        // 🎯 CASO 1: Usuario eligió "Usar Código Ingresado"
         codigoBarra = codigo_barra.trim();
-        logger.debug("🔄 Usando código proporcionado por usuario", {
+        logger.debug("🔄 REGENERATE: Usando código proporcionado por usuario", {
           producto_id: id,
           codigo: codigoBarra,
         });
@@ -1038,19 +1038,28 @@ const productoController = {
         productoActual.codigo_barra &&
         productoActual.codigo_barra.trim() !== ""
       ) {
-        // 🎯 CASO 2: No se envió código, pero producto tiene código existente
-        codigoBarra = productoActual.codigo_barra;
-        logger.debug("🔄 Usando código existente del producto", {
-          producto_id: id,
-          codigo: codigoBarra,
-        });
-      } else {
-        // 🎯 CASO 3: No hay código existente ni se envió uno → Generar automático
+        // 🎯 CASO 2: Usuario eligió "Generar Automático" pero producto YA tiene código
+        // → En regenerate-codes, SIEMPRE generar NUEVO código cuando es automático
         codigoBarra = await BarcodeGenerator.generateUniqueBarcode();
-        logger.debug("🔄 Generando código automáticamente", {
-          producto_id: id,
-          codigo_generado: codigoBarra,
-        });
+        logger.debug(
+          "🔄 REGENERATE: Generando CÓDIGO NUEVO (reemplazando existente)",
+          {
+            producto_id: id,
+            codigo_anterior: productoActual.codigo_barra,
+            codigo_nuevo: codigoBarra,
+            contexto: "regeneracion_automatica_con_codigo_existente",
+          }
+        );
+      } else {
+        // 🎯 CASO 3: No hay código existente → Generar automático
+        codigoBarra = await BarcodeGenerator.generateUniqueBarcode();
+        logger.debug(
+          "🔄 REGENERATE: Generando código automáticamente (sin código previo)",
+          {
+            producto_id: id,
+            codigo_generado: codigoBarra,
+          }
+        );
       }
 
       // ✅ VALIDAR que el código no esté vacío después de toda la lógica
