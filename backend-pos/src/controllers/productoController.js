@@ -81,23 +81,23 @@ const productoController = {
       const sortField = validSortFields.includes(sortBy) ? sortBy : "nombre";
       const order = sortOrder.toUpperCase() === "DESC" ? "DESC" : "ASC";
 
-     // Construir la lista de condiciones WHERE
-const whereSQL = whereConditions.length
-  ? `WHERE ${whereConditions.join(" AND ")}`
-  : "";
+      // Construir la lista de condiciones WHERE
+      const whereSQL = whereConditions.length
+        ? `WHERE ${whereConditions.join(" AND ")}`
+        : "";
 
-// 🟣 Calcular posiciones correctas para LIMIT y OFFSET
-params.push(limitNum);
-params.push(offset);
+      // 🟣 Calcular posiciones correctas para LIMIT y OFFSET
+      params.push(limitNum);
+      params.push(offset);
 
-const limitIndex = params.length - 1;
-const offsetIndex = params.length;
+      const limitIndex = params.length - 1;
+      const offsetIndex = params.length;
 
-// 🧩 Log temporal para depurar
-logger.debug("🧮 Consulta productos ejecutada", { whereSQL, params });
+      // 🧩 Log temporal para depurar
+      logger.debug("🧮 Consulta productos ejecutada", { whereSQL, params });
 
-// 🟣 Consulta SQL corregida
-const sql = `
+      // 🟣 Consulta SQL corregida
+      const sql = `
   SELECT p.*, 
          c.nombre AS categoria_nombre, 
          pr.nombre AS proveedor_nombre,
@@ -110,7 +110,6 @@ const sql = `
   ORDER BY p.${sortField} ${order}
   LIMIT $${limitIndex} OFFSET $${offsetIndex};
 `;
-
 
       const result = await client.query(sql, params);
 
@@ -854,9 +853,16 @@ const sql = `
       const id = QueryBuilder.validateId(req.params.id);
       const { newBarcode } = req.body;
 
-      // Verificar que el producto existe
+      // ✅ CORRECCIÓN: Obtener producto con consulta mejorada
       const productoExistente = await client.query(
-        "SELECT * FROM productos WHERE id_producto = $1",
+        `SELECT p.*, 
+              c.nombre as categoria_nombre, 
+              pr.nombre as proveedor_nombre,
+              pr.contacto as proveedor_contacto
+       FROM productos p
+       LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+       LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
+       WHERE p.id_producto = $1`,
         [id]
       );
 
@@ -865,7 +871,9 @@ const sql = `
         return responseHelper.notFound(res, "Producto");
       }
 
-      const productoActual = ModelMapper.toProducto(productoExistente.rows[0]);
+      // ✅ Usar ModelMapper normalmente (debería funcionar)
+      const productoRow = productoExistente.rows[0];
+      const productoActual = ModelMapper.toProducto(productoRow);
       const codigoBarra = newBarcode || productoActual.codigo_barra;
 
       // Validar nuevo código si se proporciona
@@ -883,30 +891,87 @@ const sql = `
         }
       }
 
-      // 🆕 REGENERAR CÓDIGOS
-      let nuevosCodigos = null;
-      try {
-        // Eliminar códigos antiguos de Cloudinary si existen
-        if (productoActual.codigos_public_ids) {
-          let idsParaBorrar;
-          // ✅ CORRECCIÓN: Verificar si ya es un objeto o si es una cadena JSON
-          if (typeof productoActual.codigos_public_ids === 'string') {
-            idsParaBorrar = JSON.parse(productoActual.codigos_public_ids);
+      // ✅ CORRECCIÓN MEJORADA: Eliminar códigos antiguos con validación robusta
+      if (productoActual.codigos_public_ids) {
+        try {
+          logger.debug("🔄 Eliminando códigos antiguos...", {
+            codigos_public_ids: productoActual.codigos_public_ids,
+          });
+
+          let publicIdsObj;
+          if (typeof productoActual.codigos_public_ids === "string") {
+            try {
+              publicIdsObj = JSON.parse(productoActual.codigos_public_ids);
+            } catch (parseError) {
+              logger.warn("No se pudo parsear codigos_public_ids:", parseError);
+              publicIdsObj = null;
+            }
           } else {
-            idsParaBorrar = productoActual.codigos_public_ids; // Ya es un objeto
+            publicIdsObj = productoActual.codigos_public_ids;
           }
 
-          const publicIds = Object.values(idsParaBorrar);
-          await BarcodeService.deleteCodesFromCloudinary(publicIds);
+          if (
+            publicIdsObj &&
+            typeof publicIdsObj === "object" &&
+            publicIdsObj !== null
+          ) {
+            const publicIds = Object.values(publicIdsObj).filter(
+              (id) => id && typeof id === "string"
+            );
+            if (publicIds.length > 0) {
+              await BarcodeService.deleteCodesFromCloudinary(publicIds);
+              logger.debug(
+                `✅ Códigos antiguos eliminados: ${publicIds.join(", ")}`
+              );
+            } else {
+              logger.debug("ℹ️ No hay public_ids válidos para eliminar");
+            }
+          } else {
+            logger.debug(
+              "ℹ️ No se encontraron codigos_public_ids válidos para eliminar"
+            );
+          }
+        } catch (deleteError) {
+          logger.warn(
+            "⚠️ Error eliminando códigos antiguos, continuando:",
+            deleteError.message
+          );
+          // No hacemos rollback, continuamos con la generación
         }
+      }
 
-        // Generar nuevos códigos
-        const productoData = {
-          ...productoActual,
-          codigo_barra: codigoBarra,
-        };
+      // ✅ PREPARAR datos para generación - DEBUG DETALLADO
+      const productoData = {
+        ...productoRow, // ✅ Esto tiene TODOS los campos de la BD
+        codigo_barra: codigoBarra,
+      };
 
+      // 🎯 DEBUG CRÍTICO: Verificar qué datos llegan al QR
+      logger.debug("🔍 DATOS PARA GENERACIÓN DE CÓDIGOS:", {
+        id_producto: productoData.id_producto,
+        nombre: productoData.nombre,
+        codigo_barra: productoData.codigo_barra,
+        precio_venta: productoData.precio_venta,
+        precio_compra: productoData.precio_compra,
+        stock: productoData.stock,
+        unidad: productoData.unidad,
+        id_categoria: productoData.id_categoria,
+        id_proveedor: productoData.id_proveedor,
+        fecha_creacion: productoData.fecha_creacion, // ✅ Esto debe existir
+        tiene_fecha_creacion: !!productoData.fecha_creacion,
+        campos_totales: Object.keys(productoData).length,
+      });
+
+      let nuevosCodigos = null;
+      try {
+        logger.debug("🔄 INICIANDO GENERACIÓN DE QR...");
+
+        // 🔄 GENERAR QR PRIMERO
         const qrResult = await QRService.generateProductQR(productoData);
+
+        logger.debug("🔄 INICIANDO GENERACIÓN DE CÓDIGO DE BARRAS...");
+
+        // 🔄 GENERAR CÓDIGO DE BARRAS
         const barcodeResult = await BarcodeService.generateProductCodes(
           productoData,
           qrResult.qr_buffer
@@ -921,12 +986,19 @@ const sql = `
           },
         };
 
-        logger.debug("Códigos regenerados exitosamente", {
+        logger.debug("✅ CÓDIGOS REGENERADOS EXITOSAMENTE", {
           producto_id: id,
-          nuevo_codigo: newBarcode || "mismo",
+          barcode_url: nuevosCodigos.barcode_url ? "✅ EXISTE" : "❌ NO EXISTE",
+          qr_url: nuevosCodigos.qr_url ? "✅ EXISTE" : "❌ NO EXISTE",
+          barcode_public_id: nuevosCodigos.codigos_public_ids.barcode,
+          qr_public_id: nuevosCodigos.codigos_public_ids.qr,
         });
       } catch (error) {
-        logger.error("Error regenerando códigos:", error);
+        logger.error("❌ ERROR CRÍTICO REGENERANDO CÓDIGOS:", {
+          message: error.message,
+          stack: error.stack,
+          producto_id: id,
+        });
         await client.query("ROLLBACK");
         return responseHelper.error(
           res,
@@ -935,16 +1007,16 @@ const sql = `
         );
       }
 
-      // Actualizar producto con nuevos códigos
+      // ✅ ACTUALIZAR EN BASE DE DATOS
       const updateResult = await client.query(
         `UPDATE productos SET 
-                    codigo_barra = $1,
-                    codigo_barras_url = $2,
-                    codigo_qr_url = $3,
-                    codigos_public_ids = $4,
-                    fecha_actualizacion = CURRENT_TIMESTAMP
-                 WHERE id_producto = $5
-                 RETURNING *`,
+        codigo_barra = $1,
+        codigo_barras_url = $2,
+        codigo_qr_url = $3,
+        codigos_public_ids = $4,
+        fecha_actualizacion = CURRENT_TIMESTAMP
+      WHERE id_producto = $5
+      RETURNING *`,
         [
           codigoBarra,
           nuevosCodigos.barcode_url,
@@ -958,6 +1030,16 @@ const sql = `
 
       const productoActualizado = ModelMapper.toProducto(updateResult.rows[0]);
 
+      // ✅ VERIFICAR ACTUALIZACIÓN
+      logger.debug("✅ VERIFICACIÓN DE ACTUALIZACIÓN EN BD:", {
+        producto_id: id,
+        codigo_barra_actualizado: productoActualizado.codigo_barra,
+        barcode_url_actualizado: productoActualizado.codigo_barras_url
+          ? "✅"
+          : "❌",
+        qr_url_actualizado: productoActualizado.codigo_qr_url ? "✅" : "❌",
+      });
+
       logger.audit("Códigos regenerados", req.user?.id_usuario, "UPDATE", {
         producto_id: id,
         nombre: productoActualizado.nombre,
@@ -965,11 +1047,12 @@ const sql = `
         nuevos_codigos: true,
       });
 
-      responseHelper.success(res, {
+      return responseHelper.success(res, {
         message: "Códigos regenerados exitosamente",
         data: {
           ...productoActualizado,
           codigos_regenerados: true,
+          nuevo_codigo_barra: codigoBarra,
         },
       });
     } catch (error) {
@@ -980,7 +1063,7 @@ const sql = `
       }
 
       logger.error("Error en productoController.regenerateCodes", error);
-      responseHelper.error(res, "Error regenerando códigos", 500, error);
+      return responseHelper.error(res, "Error regenerando códigos", 500, error);
     } finally {
       client.release();
     }
