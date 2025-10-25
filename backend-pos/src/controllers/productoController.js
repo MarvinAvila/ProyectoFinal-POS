@@ -858,7 +858,6 @@ const productoController = {
         `SELECT p.*, 
               c.nombre as categoria_nombre, 
               pr.nombre as proveedor_nombre,
-              pr.contacto as proveedor_contacto
        FROM productos p
        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
        LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
