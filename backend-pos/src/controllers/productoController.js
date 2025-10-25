@@ -964,7 +964,7 @@ const productoController = {
       await client.query("BEGIN");
 
       const id = QueryBuilder.validateId(req.params.id);
-      const { newBarcode } = req.body;
+      const { codigo_barra } = req.body;
 
       // ✅ CORRECCIÓN: Obtener producto con consulta mejorada
       const productoExistente = await client.query(
@@ -986,13 +986,13 @@ const productoController = {
       // ✅ Usar ModelMapper normalmente (debería funcionar)
       const productoRow = productoExistente.rows[0];
       const productoActual = ModelMapper.toProducto(productoRow);
-      const codigoBarra = newBarcode || productoActual.codigo_barra;
+      const codigoBarra = codigo_barra || productoActual.codigo_barra;
 
       // Validar nuevo código si se proporciona
-      if (newBarcode && newBarcode !== productoActual.codigo_barra) {
+      if (codigoBarra && codigoBarra !== productoActual.codigo_barra) {
         const codigoExistente = await client.query(
           "SELECT id_producto FROM productos WHERE codigo_barra = $1 AND id_producto != $2",
-          [newBarcode, id]
+          [codigo_barra, id]
         );
         if (codigoExistente.rows.length > 0) {
           await client.query("ROLLBACK");
@@ -1155,7 +1155,7 @@ const productoController = {
       logger.audit("Códigos regenerados", req.user?.id_usuario, "UPDATE", {
         producto_id: id,
         nombre: productoActualizado.nombre,
-        codigo_cambiado: !!newBarcode,
+        codigo_cambiado: !!codigo_barra,
         nuevos_codigos: true,
       });
 
