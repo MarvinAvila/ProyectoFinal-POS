@@ -56,7 +56,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (p != null) {
       _codigoCtrl.text = p.codigoBarra;
       _nombreCtrl.text = p.nombre;
-      _precioCompraCtrl.text = p.precioCompra.toString(); // ✅ 3. Quitar operador innecesario
+      _precioCompraCtrl.text =
+          p.precioCompra.toString(); // ✅ 3. Quitar operador innecesario
       _precioCtrl.text = p.precioVenta.toString();
       _stockCtrl.text = p.stock.toString();
       _unidadSeleccionada = p.unidad;
@@ -198,9 +199,120 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final tempFile = File('${tempDir.path}/$_selectedFileName');
       await tempFile.writeAsBytes(_imageBytes!);
       return tempFile;
-    } catch (e) { // ✅ 4. Usar debugPrint en lugar de print
+    } catch (e) {
+      // ✅ 4. Usar debugPrint en lugar de print
       debugPrint('Error creando archivo temporal: $e');
       return null;
+    }
+  }
+
+  Future<void> _regenerateCodes() async {
+    if (widget.product == null) return;
+
+    // ✅ DETERMINAR EL MENSAJE Y OPCIONES BASADO EN EL CAMPO
+    final tieneCodigo = _codigoCtrl.text.trim().isNotEmpty;
+    final String codigoActual = _codigoCtrl.text.trim();
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              tieneCodigo ? 'Generar Códigos' : 'Generar Códigos Automáticos',
+            ),
+            content: Text(
+              tieneCodigo
+                  ? '¿Qué código deseas usar para generar los nuevos códigos?\n\nCódigo actual: "$codigoActual"'
+                  : 'Se generará un código de barras automático y un nuevo QR para este producto.',
+            ),
+            actions: [
+              // Botón Cancelar
+              TextButton(
+                onPressed:
+                    () => Navigator.pop(context, null), // null = cancelar
+                child: const Text('Cancelar'),
+              ),
+
+              // ✅ BOTONES DINÁMICOS
+              if (!tieneCodigo) ...[
+                // Solo un botón cuando no hay código
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Generar Automático'),
+                ),
+              ] else ...[
+                // Dos botones cuando hay código en el campo
+                OutlinedButton(
+                  onPressed:
+                      () => Navigator.pop(
+                        context,
+                        false,
+                      ), // false = generar automático
+                  child: const Text('Generar Automático'),
+                ),
+                FilledButton(
+                  onPressed:
+                      () => Navigator.pop(
+                        context,
+                        true,
+                      ), // true = usar código ingresado
+                  child: const Text('Usar Código Ingresado'),
+                ),
+              ],
+            ],
+          ),
+    );
+
+    // Si es null, el usuario canceló
+    if (confirm == null) return;
+
+    setState(() => _loading = true);
+
+    try {
+      FocusScope.of(context).unfocus();
+
+      String? codigoParaEnviar;
+      String mensajeExito;
+
+      // ✅ LÓGICA INTELIGENTE BASADA EN LA ELECCIÓN DEL USUARIO
+      if (tieneCodigo) {
+        if (confirm == true) {
+          // Usuario eligió "Usar Código Ingresado"
+          codigoParaEnviar = codigoActual;
+          mensajeExito = 'Códigos generados usando: $codigoActual';
+        } else {
+          // Usuario eligió "Generar Automático" - no enviar código
+          codigoParaEnviar = null;
+          mensajeExito = 'Códigos generados automáticamente';
+        }
+      } else {
+        // Campo vacío - siempre generar automático
+        codigoParaEnviar = null;
+        mensajeExito = 'Códigos generados automáticamente';
+      }
+
+      // ✅ LLAMAR AL BACKEND CON LA ELECCIÓN
+      final productoActualizado = await _repo.regenerateCodes(
+        widget.product!.idProducto,
+        newBarcode: codigoParaEnviar,
+      );
+
+      if (!mounted) return;
+
+      // ✅ ACTUALIZAR LA INTERFAZ CON EL NUEVO CÓDIGO
+      setState(() {
+        _codigoCtrl.text = productoActualizado.codigoBarra;
+      });
+
+      _showSuccess(
+        '$mensajeExito\nNuevo código: ${productoActualizado.codigoBarra}',
+      );
+    } on ApiError catch (e) {
+      _showError('Error al generar códigos: ${e.message}');
+    } catch (e) {
+      _showError('Error inesperado: $e');
+    } finally {
+      setState(() => _loading = false);
     }
   }
 
@@ -337,7 +449,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                validator: (v) => v!.isEmpty ? 'Campo obligatorio' : null,
+                // ✅ CAMBIO: El código de barras ya no es obligatorio
+                validator: null,
               ),
               const SizedBox(height: 16),
 
@@ -397,22 +510,32 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          suffixIcon: _loadingCategories
-                              ? const Padding(
-                                  padding: EdgeInsets.all(12.0),
-                                  child: SizedBox(
+                          suffixIcon:
+                              _loadingCategories
+                                  ? const Padding(
+                                    padding: EdgeInsets.all(12.0),
+                                    child: SizedBox(
                                       width: 20,
                                       height: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2)),
-                                )
-                              : null,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  )
+                                  : null,
                         ),
-                        items: _categorias.map((cat) {
-                          return DropdownMenuItem(
-                              value: cat.idCategoria, child: Text(cat.nombre));
-                        }).toList(),
-                        onChanged: (v) => setState(() => _idCategoriaSeleccionada = v),
-                        validator: (v) => v == null ? 'Seleccione una categoría' : null,
+                        items:
+                            _categorias.map((cat) {
+                              return DropdownMenuItem(
+                                value: cat.idCategoria,
+                                child: Text(cat.nombre),
+                              );
+                            }).toList(),
+                        onChanged:
+                            (v) => setState(() => _idCategoriaSeleccionada = v),
+                        validator:
+                            (v) =>
+                                v == null ? 'Seleccione una categoría' : null,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -422,7 +545,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       tooltip: 'Nueva Categoría',
                       style: IconButton.styleFrom(
                         padding: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onPressed: _crearNuevaCategoria,
                     ),
@@ -432,6 +557,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
               const SizedBox(height: 24),
 
+              // 🆕 BOTÓN DE REGENERAR (solo en modo edición)
+              if (isEdit)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 24.0),
+                  child: Center(
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : _regenerateCodes,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Regenerar Códigos (QR y Barras)'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange.shade800,
+                        side: BorderSide(color: Colors.orange.shade800),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Botón de Guardar/Actualizar
               Center(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
@@ -480,10 +623,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (_) => ChangeNotifierProvider.value(
-        value: categoriesController,
-        child: const CategoryForm(),
-      ),
+      builder:
+          (_) => ChangeNotifierProvider.value(
+            value: categoriesController,
+            child: const CategoryForm(),
+          ),
     );
 
     // Si el formulario se guardó con éxito (result == true)

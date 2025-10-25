@@ -252,6 +252,31 @@ class ProductRepository {
     await _api.delete('${Endpoints.productos}/$id');
   }
 
+  /// 🆕 MÉTODO NUEVO: Regenerar códigos para un producto existente.
+  Future<Product> regenerateCodes(int id, {String? newBarcode}) async {
+    try {
+      final data = await _api.post(
+        '${Endpoints.productos}/$id/regenerate-codes',
+        data: {
+          if (newBarcode != null && newBarcode.trim().isNotEmpty)
+            'codigo_barra': newBarcode.trim(),
+        },
+      );
+      final m =
+          (data is Map && data['data'] != null)
+              ? asMap(data['data'])
+              : asMap(data);
+      return Product.fromJson(m);
+    } catch (e) {
+      if (kDebugMode) {
+        print(
+          '❌ [Repository] Error en regenerateCodes para el producto $id: $e',
+        );
+      }
+      rethrow;
+    }
+  }
+
   /// Busca un producto por su código de barras.
   Future<Product?> byBarcode(String code) async {
     try {

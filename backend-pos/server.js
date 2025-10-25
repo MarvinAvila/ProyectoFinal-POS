@@ -424,6 +424,197 @@ app.post("/api/admin/update-alertas-table", async (req, res) => {
   }
 });
 
+// ✅ NUEVO: Endpoint para migrar productos sin código de barras
+app.post("/api/admin/migrate-productos-sin-codigo", async (req, res) => {
+  console.log("🔄 Iniciando migración de productos sin código de barras...");
+
+  const db = require("./src/config/database");
+  const BarcodeGenerator = require("./src/utils/barcodeGenerator");
+  const BarcodeService = require("./src/services/barcodeService");
+  const QRService = require("./src/services/qrService");
+  const logger = require("./src/utils/logger");
+
+  const client = await db.getClient();
+
+  try {
+    await client.query("BEGIN");
+
+    // 1. Encontrar productos sin código de barras
+    console.log("1. 🔍 Buscando productos sin código de barras...");
+    const productosSinCodigo = await client.query(
+      `SELECT id_producto, nombre, precio_venta, stock, unidad, 
+              id_categoria, id_proveedor, fecha_creacion
+       FROM productos 
+       WHERE codigo_barra IS NULL OR codigo_barra = '' OR codigo_barra = '0'`
+    );
+
+    console.log(
+      `   📦 Encontrados ${productosSinCodigo.rows.length} productos sin código`
+    );
+
+    let productosMigrados = 0;
+    let productosConErrores = 0;
+
+    // 2. Procesar cada producto
+    for (const producto of productosSinCodigo.rows) {
+      try {
+        console.log(
+          `   🔄 Procesando: ${producto.nombre} (ID: ${producto.id_producto})`
+        );
+
+        // 🆕 GENERAR CÓDIGO DE BARRAS AUTOMÁTICO
+        const nuevoCodigo = await BarcodeGenerator.generateUniqueBarcode();
+        console.log(`      📊 Código generado: ${nuevoCodigo}`);
+
+        // 🆕 PREPARAR DATOS PARA GENERAR CÓDIGOS
+        const productoData = {
+          ...producto,
+          codigo_barra: nuevoCodigo,
+        };
+
+        let codigosGenerados = null;
+
+        try {
+          // 🆕 GENERAR CÓDIGO DE BARRAS
+          console.log(`      🖼️ Generando código de barras...`);
+          const barcodeResult = await BarcodeService.generateProductCodes(
+            productoData
+          );
+
+          // 🆕 GENERAR QR CON LOS DATOS COMPLETOS
+          console.log(`      📱 Generando QR...`);
+          const productoDataConBarcodeURL = {
+            ...productoData,
+            codigo_barras_url: barcodeResult.barcode_url,
+          };
+          const qrResult = await QRService.generateProductQR(
+            productoDataConBarcodeURL
+          );
+
+          codigosGenerados = {
+            barcode_url: barcodeResult.barcode_url,
+            qr_url: qrResult.qr_url,
+            codigos_public_ids: {
+              barcode: barcodeResult.barcode_public_id,
+              qr: qrResult.qr_public_id,
+            },
+          };
+
+          console.log(`      ✅ Códigos generados exitosamente`);
+        } catch (error) {
+          console.log(`      ⚠️ Error generando códigos: ${error.message}`);
+          // Continuar con la migración aunque falle la generación de códigos
+          codigosGenerados = null;
+        }
+
+        // 🆕 ACTUALIZAR PRODUCTO EN BD
+        await client.query(
+          `UPDATE productos SET 
+           codigo_barra = $1,
+           codigo_barras_url = $2,
+           codigo_qr_url = $3,
+           codigos_public_ids = $4,
+           fecha_actualizacion = CURRENT_TIMESTAMP
+           WHERE id_producto = $5`,
+          [
+            nuevoCodigo,
+            codigosGenerados?.barcode_url || null,
+            codigosGenerados?.qr_url || null,
+            codigosGenerados
+              ? JSON.stringify(codigosGenerados.codigos_public_ids)
+              : null,
+            producto.id_producto,
+          ]
+        );
+
+        productosMigrados++;
+        console.log(`      ✅ Producto migrado: ${producto.nombre}`);
+      } catch (error) {
+        productosConErrores++;
+        console.log(
+          `      ❌ Error migrando ${producto.nombre}: ${error.message}`
+        );
+        // Continuar con el siguiente producto
+      }
+    }
+
+    await client.query("COMMIT");
+
+    // 3. VERIFICAR RESULTADO FINAL
+    console.log("\n🎉 MIGRACIÓN COMPLETADA!");
+    console.log(`   ✅ Productos migrados: ${productosMigrados}`);
+    console.log(`   ❌ Productos con errores: ${productosConErrores}`);
+    console.log(`   📊 Total procesados: ${productosSinCodigo.rows.length}`);
+
+    res.json({
+      success: true,
+      message: "Migración de productos sin código completada",
+      resultados: {
+        productos_procesados: productosSinCodigo.rows.length,
+        productos_migrados: productosMigrados,
+        productos_con_errores: productosConErrores,
+        porcentaje_exito:
+          ((productosMigrados / productosSinCodigo.rows.length) * 100).toFixed(
+            2
+          ) + "%",
+      },
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("\n❌ ERROR durante la migración:", error.message);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      mensaje: "Error durante la migración de productos",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ✅ NUEVO: Endpoint para verificar estado de migración
+app.get("/api/admin/estado-migracion", async (req, res) => {
+  const db = require("./src/config/database");
+  const client = await db.getClient();
+
+  try {
+    const resultado = await client.query(`
+      SELECT 
+        COUNT(*) as total_productos,
+        COUNT(*) FILTER (WHERE codigo_barra IS NULL OR codigo_barra = '' OR codigo_barra = '0') as sin_codigo,
+        COUNT(*) FILTER (WHERE codigo_barra IS NOT NULL AND codigo_barra != '' AND codigo_barra != '0') as con_codigo,
+        COUNT(*) FILTER (WHERE codigo_barras_url IS NOT NULL) as con_barcode_url,
+        COUNT(*) FILTER (WHERE codigo_qr_url IS NOT NULL) as con_qr_url
+      FROM productos
+      WHERE activo = TRUE
+    `);
+
+    const total = parseInt(resultado.rows[0].total_productos);
+    const conCodigo = parseInt(resultado.rows[0].con_codigo);
+
+    res.json({
+      success: true,
+      estado_migracion: {
+        total_productos: total,
+        productos_sin_codigo: parseInt(resultado.rows[0].sin_codigo),
+        productos_con_codigo: conCodigo,
+        productos_con_barcode: parseInt(resultado.rows[0].con_barcode_url),
+        productos_con_qr: parseInt(resultado.rows[0].con_qr_url),
+        porcentaje_completado:
+          total > 0 ? ((conCodigo / total) * 100).toFixed(2) + "%" : "0%",
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  } finally {
+    client.release();
+  }
+});
+
 // Manejo de errores 404
 app.use("*", (req, res) => {
   res.status(404).json({
