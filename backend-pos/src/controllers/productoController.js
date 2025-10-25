@@ -288,7 +288,7 @@ const productoController = {
       // Sanitizar entrada
       const productoData = {
         nombre: helpers.sanitizeInput(nombre),
-        codigo_barra: codigoBarraFinal, // 🆕 Usar código generado o proporcionado
+        codigo_barra: codigoBarraFinal,
         precio_compra: parseFloat(precio_compra),
         precio_venta: parseFloat(precio_venta),
         stock: parseFloat(stock) || 0,
@@ -303,7 +303,7 @@ const productoController = {
         imagen: null,
       };
 
-      // ✅ PROCESAR IMAGEN SI SE SUBIÓ (mantener tu lógica actual)
+      // ✅ PROCESAR IMAGEN SI SE SUBIÓ
       if (req.file) {
         const cloudinary = require("../config/cloudinary");
         const b64 = Buffer.from(req.file.buffer).toString("base64");
@@ -318,7 +318,7 @@ const productoController = {
         productoData.imagen = result.secure_url;
       }
 
-      // Validar usando el modelo (mantener tu lógica actual)
+      // Validaciones existentes (mantener igual)
       const validationErrors = Producto.validate(productoData);
       if (validationErrors.length > 0) {
         await client.query("ROLLBACK");
@@ -327,7 +327,6 @@ const productoController = {
         });
       }
 
-      // Verificar código de barras único (mantener tu lógica actual)
       if (productoData.codigo_barra) {
         const codigoExistente = await client.query(
           "SELECT id_producto FROM productos WHERE codigo_barra = $1",
@@ -342,7 +341,6 @@ const productoController = {
         }
       }
 
-      // Verificar categoría si se proporciona (mantener tu lógica actual)
       if (id_categoria) {
         const categoriaExists = await client.query(
           "SELECT id_categoria FROM categorias WHERE id_categoria = $1",
@@ -354,7 +352,6 @@ const productoController = {
         }
       }
 
-      // Verificar proveedor si se proporciona (mantener tu lógica actual)
       if (id_proveedor) {
         const proveedorExists = await client.query(
           "SELECT id_proveedor FROM proveedores WHERE id_proveedor = $1",
@@ -366,16 +363,27 @@ const productoController = {
         }
       }
 
-      // 🆕 GENERAR CÓDIGOS (BARRAS + QR) ANTES DE INSERTAR
+      // 🆕 FLUJO CORREGIDO: GENERAR CÓDIGOS EN ORDEN CORRECTO
       let codigosGenerados = null;
       try {
-        // Generar QR primero para tener los datos completos
-        const qrResult = await QRService.generateProductQR(productoData);
+        logger.debug(
+          "🔄 Iniciando generación de códigos para nuevo producto..."
+        );
 
-        // Generar código de barras con la información del QR
+        // 1️⃣ GENERAR CÓDIGO DE BARRAS PRIMERO
         const barcodeResult = await BarcodeService.generateProductCodes(
-          productoData,
-          qrResult.qr_buffer
+          productoData
+        );
+
+        // 2️⃣ PREPARAR DATOS PARA QR CON LA URL DEL CÓDIGO DE BARRAS
+        const productoDataConBarcodeURL = {
+          ...productoData,
+          codigo_barras_url: barcodeResult.barcode_url,
+        };
+
+        // 3️⃣ GENERAR QR CON LA URL DEL CÓDIGO DE BARRAS
+        const qrResult = await QRService.generateProductQR(
+          productoDataConBarcodeURL
         );
 
         codigosGenerados = {
@@ -387,23 +395,23 @@ const productoController = {
           },
         };
 
-        logger.debug("Códigos generados exitosamente para nuevo producto", {
+        logger.debug("✅ Códigos generados exitosamente para nuevo producto", {
           producto: productoData.nombre,
           barcode_url: codigosGenerados.barcode_url,
           qr_url: codigosGenerados.qr_url,
+          orden_correcto: true,
         });
       } catch (error) {
         logger.warn("Error generando códigos, continuando sin códigos:", error);
-        // No hacemos rollback, el producto se crea sin códigos
         codigosGenerados = null;
       }
 
       // ✅ INSERT con soporte para imagen Y códigos
       const result = await client.query(
         `INSERT INTO productos (
-          id_categoria, id_proveedor, nombre, codigo_barra, 
-          precio_compra, precio_venta, stock, unidad, fecha_caducidad, 
-          imagen, codigo_barras_url, codigo_qr_url, codigos_public_ids
+        id_categoria, id_proveedor, nombre, codigo_barra, 
+        precio_compra, precio_venta, stock, unidad, fecha_caducidad, 
+        imagen, codigo_barras_url, codigo_qr_url, codigos_public_ids
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *`,
         [
@@ -417,11 +425,11 @@ const productoController = {
           productoData.unidad,
           productoData.fecha_caducidad,
           productoData.imagen,
-          codigosGenerados?.barcode_url || null, // 🆕 URL código barras
-          codigosGenerados?.qr_url || null, // 🆕 URL código QR
+          codigosGenerados?.barcode_url || null,
+          codigosGenerados?.qr_url || null,
           codigosGenerados
             ? JSON.stringify(codigosGenerados.codigos_public_ids)
-            : null, // 🆕 IDs públicos
+            : null,
         ]
       );
 
@@ -435,8 +443,8 @@ const productoController = {
         precio_venta: nuevoProducto.precio_venta,
         stock_inicial: nuevoProducto.stock,
         tiene_imagen: !!nuevoProducto.imagen,
-        tiene_codigos: !!codigosGenerados, // 🆕 Nuevo campo de auditoría
-        codigo_generado: !codigo_barra, // 🆕 Si se generó automáticamente
+        tiene_codigos: !!codigosGenerados,
+        codigo_generado: !codigo_barra,
       });
 
       return res.status(201).json({
@@ -446,12 +454,11 @@ const productoController = {
           (codigosGenerados ? " con códigos generados" : ""),
         data: {
           ...nuevoProducto,
-          codigos_generados: !!codigosGenerados, // 🆕 Indicar si se generaron códigos
+          codigos_generados: !!codigosGenerados,
         },
       });
     } catch (error) {
       await client.query("ROLLBACK");
-
       if (error.message === "ID inválido") {
         return responseHelper.error(
           res,
@@ -459,7 +466,6 @@ const productoController = {
           400
         );
       }
-
       logger.error("Error en productoController.create", error);
       return responseHelper.error(res, "Error creando producto", 500, error);
     } finally {
@@ -486,9 +492,56 @@ const productoController = {
         return responseHelper.notFound(res, "Producto");
       }
 
-      // Preparar datos actuales
-      const productoActual = productoExistente.rows[0];
+      const productoActual = ModelMapper.toProducto(productoExistente.rows[0]);
       const productoData = { ...productoActual };
+
+      // 🆕 DETERMINAR NUEVO CÓDIGO DE BARRAS
+      let nuevoCodigoBarra = productoActual.codigo_barra;
+      let codigoBarraCambiado = false;
+
+      if (updates.codigo_barra !== undefined) {
+        // Si se proporciona nuevo código, usarlo
+        nuevoCodigoBarra = updates.codigo_barra;
+        codigoBarraCambiado = true;
+      } else if (!productoActual.codigo_barra) {
+        // Si no hay código existente, generar uno nuevo
+        nuevoCodigoBarra = await BarcodeGenerator.generateUniqueBarcode();
+        codigoBarraCambiado = true;
+      }
+
+      // ✅ ELIMINAR CÓDIGOS ANTIGUOS SI EL CÓDIGO DE BARRAS CAMBIA
+      let codigosEliminados = false;
+      if (codigoBarraCambiado && productoActual.codigos_public_ids) {
+        try {
+          logger.debug("🔄 Eliminando códigos antiguos de Cloudinary...");
+
+          let publicIdsObj;
+          if (typeof productoActual.codigos_public_ids === "string") {
+            publicIdsObj = JSON.parse(productoActual.codigos_public_ids);
+          } else {
+            publicIdsObj = productoActual.codigos_public_ids;
+          }
+
+          if (
+            publicIdsObj &&
+            typeof publicIdsObj === "object" &&
+            publicIdsObj !== null
+          ) {
+            const publicIds = Object.values(publicIdsObj).filter(
+              (id) => id && typeof id === "string"
+            );
+            if (publicIds.length > 0) {
+              await BarcodeService.deleteCodesFromCloudinary(publicIds);
+              codigosEliminados = true;
+              logger.debug(
+                `✅ Códigos antiguos eliminados: ${publicIds.join(", ")}`
+              );
+            }
+          }
+        } catch (deleteError) {
+          logger.warn("Error eliminando códigos antiguos:", deleteError);
+        }
+      }
 
       // ✅ PROCESAR NUEVA IMAGEN SI SE SUBIÓ
       if (req.file) {
@@ -503,14 +556,11 @@ const productoController = {
           try {
             await cloudinary.uploader.destroy(publicId);
           } catch (deleteError) {
-            console.log(
-              "No se pudo eliminar imagen anterior de Cloudinary:",
-              deleteError
-            );
+            logger.warn("No se pudo eliminar imagen anterior:", deleteError);
           }
         }
 
-        // Subir nueva imagen a Cloudinary
+        // Subir nueva imagen
         const b64 = Buffer.from(req.file.buffer).toString("base64");
         const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
 
@@ -520,7 +570,6 @@ const productoController = {
           fetch_format: "auto",
         });
 
-        // ✅ Solo guardamos la nueva URL en la base de datos
         productoData.imagen = result.secure_url;
         updates.imagen = result.secure_url;
       }
@@ -528,8 +577,7 @@ const productoController = {
       // Aplicar updates validados
       if (updates.nombre !== undefined)
         productoData.nombre = helpers.sanitizeInput(updates.nombre);
-      if (updates.codigo_barra !== undefined)
-        productoData.codigo_barra = updates.codigo_barra;
+      if (codigoBarraCambiado) productoData.codigo_barra = nuevoCodigoBarra;
       if (updates.precio_compra !== undefined)
         productoData.precio_compra = parseFloat(updates.precio_compra);
       if (updates.precio_venta !== undefined)
@@ -559,12 +607,12 @@ const productoController = {
 
       // Verificar código de barras único si se cambia
       if (
-        updates.codigo_barra &&
-        updates.codigo_barra !== productoActual.codigo_barra
+        codigoBarraCambiado &&
+        nuevoCodigoBarra !== productoActual.codigo_barra
       ) {
         const codigoExistente = await client.query(
           "SELECT id_producto FROM productos WHERE codigo_barra = $1 AND id_producto != $2",
-          [updates.codigo_barra, id]
+          [nuevoCodigoBarra, id]
         );
         if (codigoExistente.rows.length > 0) {
           await client.query("ROLLBACK");
@@ -575,7 +623,60 @@ const productoController = {
         }
       }
 
-      // Construir query dinámica (incluye soporte para imagen)
+      // 🆕 GENERAR NUEVOS CÓDIGOS SI ES NECESARIO
+      let nuevosCodigos = null;
+      if (codigoBarraCambiado || req.file) {
+        try {
+          logger.debug(
+            "🔄 Generando nuevos códigos para producto actualizado..."
+          );
+
+          // 1️⃣ GENERAR CÓDIGO DE BARRAS PRIMERO
+          const barcodeResult = await BarcodeService.generateProductCodes(
+            productoData
+          );
+
+          // 2️⃣ PREPARAR DATOS PARA QR CON LA URL DEL CÓDIGO DE BARRAS
+          const productoDataConBarcodeURL = {
+            ...productoData,
+            codigo_barras_url: barcodeResult.barcode_url,
+          };
+
+          // 3️⃣ GENERAR QR CON LA URL DEL CÓDIGO DE BARRAS
+          const qrResult = await QRService.generateProductQR(
+            productoDataConBarcodeURL
+          );
+
+          nuevosCodigos = {
+            barcode_url: barcodeResult.barcode_url,
+            qr_url: qrResult.qr_url,
+            codigos_public_ids: {
+              barcode: barcodeResult.barcode_public_id,
+              qr: qrResult.qr_public_id,
+            },
+          };
+
+          logger.debug(
+            "✅ Nuevos códigos generados para producto actualizado",
+            {
+              producto_id: id,
+              barcode_url: nuevosCodigos.barcode_url,
+              qr_url: nuevosCodigos.qr_url,
+            }
+          );
+
+          // Agregar campos de códigos a los updates
+          updates.codigo_barras_url = nuevosCodigos.barcode_url;
+          updates.codigo_qr_url = nuevosCodigos.qr_url;
+          updates.codigos_public_ids = JSON.stringify(
+            nuevosCodigos.codigos_public_ids
+          );
+        } catch (error) {
+          logger.warn("Error generando nuevos códigos:", error);
+        }
+      }
+
+      // Construir query dinámica (incluye soporte para imagen Y códigos)
       const setClauses = [];
       const values = [];
       let paramIndex = 1;
@@ -596,6 +697,14 @@ const productoController = {
         } else if (["precio_compra", "precio_venta", "stock"].includes(field)) {
           setClauses.push(`${field} = $${paramIndex}`);
           values.push(parseFloat(updates[field]));
+          paramIndex++;
+        } else if (
+          ["codigo_barras_url", "codigo_qr_url", "codigos_public_ids"].includes(
+            field
+          )
+        ) {
+          setClauses.push(`${field} = $${paramIndex}`);
+          values.push(updates[field]);
           paramIndex++;
         } else if (field === "id_categoria") {
           setClauses.push(`id_categoria = $${paramIndex}`);
@@ -636,18 +745,23 @@ const productoController = {
 
       logger.audit("Producto actualizado", req.user?.id_usuario, "UPDATE", {
         producto_id: id,
+        nombre: productoActualizado.nombre,
         campos_actualizados: Object.keys(updates),
         imagen_actualizada: !!req.file,
+        codigos_regenerados: !!nuevosCodigos,
+        codigos_eliminados: codigosEliminados,
+        codigo_barra_cambiado: codigoBarraCambiado,
       });
 
       return res.status(200).json({
         success: true,
-        message: "Producto actualizado exitosamente",
+        message:
+          "Producto actualizado exitosamente" +
+          (nuevosCodigos ? " con códigos regenerados" : ""),
         data: productoActualizado,
       });
     } catch (error) {
       await client.query("ROLLBACK");
-
       if (error.message === "ID inválido") {
         return responseHelper.error(
           res,
@@ -655,7 +769,6 @@ const productoController = {
           400
         );
       }
-
       logger.error("Error en productoController.update", error);
       return responseHelper.error(
         res,
