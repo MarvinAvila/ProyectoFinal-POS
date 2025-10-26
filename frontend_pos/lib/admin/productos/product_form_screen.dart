@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart'; // ✅ REEMPLAZADO
 import 'package:intl/intl.dart';
 
 import 'product_model.dart';
@@ -30,6 +30,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   int? _idProveedor;
   bool _guardando = false;
 
+  // ✅ NUEVO: Controlador para el scanner
+  MobileScannerController? _scannerController;
+  bool _isScanning = false;
+
   final unidades = ['pieza', 'kg', 'lt', 'otro'];
 
   @override
@@ -56,19 +60,106 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _precioCompraCtrl.dispose();
     _precioVentaCtrl.dispose();
     _stockCtrl.dispose();
+    _scannerController?.dispose(); // ✅ NUEVO: Dispose del scanner
     super.dispose();
   }
 
+  // ✅ ACTUALIZADO: Escanear código de barras con mobile_scanner
   Future<void> _scanBarcode() async {
-    final result = await FlutterBarcodeScanner.scanBarcode(
-      '#ff6666',
-      'Cancelar',
-      true,
-      ScanMode.BARCODE,
-    );
-    if (result != '-1') {
-      setState(() => _codigoCtrl.text = result);
+    try {
+      setState(() {
+        _isScanning = true;
+        _scannerController = MobileScannerController();
+      });
+
+      final barcode = await showDialog<String>(
+        context: context,
+        builder: (context) => _buildScannerDialog(),
+      );
+
+      if (barcode != null && barcode.isNotEmpty) {
+        setState(() => _codigoCtrl.text = barcode);
+      }
+    } catch (e) {
+      _showError('Error al escanear: $e');
+    } finally {
+      setState(() {
+        _isScanning = false;
+        _scannerController?.dispose();
+        _scannerController = null;
+      });
     }
+  }
+
+  // ✅ NUEVO: Dialog para el scanner
+  Widget _buildScannerDialog() {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.7,
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Escanear Código de Barras',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    _scannerController?.dispose();
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: MobileScanner(
+                  controller: _scannerController,
+                  onDetect: (capture) {
+                    final List<Barcode> barcodes = capture.barcodes;
+                    if (barcodes.isNotEmpty) {
+                      final String barcode = barcodes.first.rawValue ?? '';
+                      if (barcode.isNotEmpty) {
+                        _scannerController?.dispose();
+                        Navigator.pop(context, barcode);
+                      }
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Enfoca el código de barras dentro del área',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ NUEVO: Método para mostrar errores
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: const TextStyle(color: Colors.white)),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _guardar() async {
@@ -228,7 +319,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _unidad,
+              initialValue: _unidad,
               decoration: const InputDecoration(
                 labelText: 'Unidad de medida',
                 prefixIcon: Icon(Icons.scale_outlined),

@@ -1,9 +1,8 @@
 // REEMPLAZA SOLO LAS PARTES NECESARIAS EN TU AddProductScreen
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart'; // ✅ REEMPLAZADO
 import 'package:frontend_pos/core/http.dart';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
@@ -48,6 +47,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   int? _idCategoriaSeleccionada;
   bool _loadingCategories = true;
 
+  // ✅ NUEVO: Controlador para el scanner
+  MobileScannerController? _scannerController;
+  bool _isScanning = false;
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +71,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _loadCategories(); // ✅ 5. Cargar categorías al iniciar la pantalla
   }
 
+  @override
+  void dispose() {
+    _scannerController?.dispose();
+    super.dispose();
+  }
+
   // ✅ 6. Nuevo método para obtener las categorías de la API
   Future<void> _loadCategories() async {
     setState(() => _loadingCategories = true);
@@ -83,21 +92,90 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  // 📷 Escanear código de barras (MANTENER IGUAL)
+  // 📷 ✅ ACTUALIZADO: Escanear código de barras con mobile_scanner
   Future<void> _scanBarcode() async {
     try {
-      final barcode = await FlutterBarcodeScanner.scanBarcode(
-        '#6A1B9A',
-        'Cancelar',
-        true,
-        ScanMode.BARCODE,
+      setState(() {
+        _isScanning = true;
+        _scannerController = MobileScannerController();
+      });
+
+      final barcode = await showDialog<String>(
+        context: context,
+        builder: (context) => _buildScannerDialog(),
       );
-      if (barcode != "-1") {
+
+      if (barcode != null && barcode.isNotEmpty) {
         setState(() => _codigoCtrl.text = barcode);
       }
     } catch (e) {
       _showError('Error al escanear: $e');
+    } finally {
+      setState(() {
+        _isScanning = false;
+        _scannerController?.dispose();
+        _scannerController = null;
+      });
     }
+  }
+
+  // ✅ NUEVO: Dialog para el scanner
+  Widget _buildScannerDialog() {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.7,
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Escanear Código de Barras',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    _scannerController?.dispose();
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: MobileScanner(
+                  controller: _scannerController,
+                  onDetect: (capture) {
+                    final List<Barcode> barcodes = capture.barcodes;
+                    if (barcodes.isNotEmpty) {
+                      final String barcode = barcodes.first.rawValue ?? '';
+                      if (barcode.isNotEmpty) {
+                        _scannerController?.dispose();
+                        Navigator.pop(context, barcode);
+                      }
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Enfoca el código de barras dentro del área',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // 🖼️ 🆕 ACTUALIZADO: Seleccionar imagen MULTIPLATAFORMA
@@ -477,7 +555,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: DropdownButtonFormField<String>(
-                  value: _unidadSeleccionada,
+                  initialValue: _unidadSeleccionada,
                   decoration: InputDecoration(
                     labelText: 'Unidad',
                     border: OutlineInputBorder(
@@ -503,7 +581,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<int>(
-                        value: _idCategoriaSeleccionada,
+                        initialValue: _idCategoriaSeleccionada,
                         isExpanded: true,
                         decoration: InputDecoration(
                           labelText: 'Categoría',
