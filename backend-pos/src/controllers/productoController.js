@@ -283,13 +283,12 @@ const productoController = {
       // Buscar producto por código de barras
       const result = await client.query(
         `SELECT p.*, 
-              c.nombre as categoria_nombre, 
-              pr.nombre as proveedor_nombre,
-              pr.contacto as proveedor_contacto
-       FROM productos p
-       LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-       LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
-       WHERE p.codigo_barra = $1 AND p.activo = true`,
+                c.nombre as categoria_nombre, 
+                pr.nombre as proveedor_nombre
+         FROM productos p
+         LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+         LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
+         WHERE (p.codigo_barra = $1 OR p.id_producto::text = $1) AND p.activo = true`,
         [code.trim()]
       );
 
@@ -351,6 +350,7 @@ const productoController = {
       client.release();
     }
   },
+
   // 🟣 Crear producto (sin stock_minimo)
   async create(req, res) {
     const client = await db.getClient();

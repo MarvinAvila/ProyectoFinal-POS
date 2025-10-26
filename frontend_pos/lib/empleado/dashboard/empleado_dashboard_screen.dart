@@ -10,6 +10,7 @@ import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart';
 import 'product_search_dialog.dart';
 import 'package:frontend_pos/auth/auth_repository.dart';
 import 'package:frontend_pos/utils/jwt_utils.dart';
+import 'dart:convert'; 
 
 class EmpleadoDashboardScreen extends StatefulWidget {
   const EmpleadoDashboardScreen({super.key});
@@ -70,7 +71,14 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
 
     final cart = context.read<CartController>();
     try {
-      final success = await cart.addByBarcode(code);
+      // ✅ NUEVO: Extraer código de producto (optimizado para tu formato QR)
+      final String productCode = _extractProductCodeFromScannedData(code);
+
+      print('🔍 [SCANNER] Datos crudos: "$code"');
+      print('🔍 [SCANNER] Código procesado: "$productCode"');
+
+      final success = await cart.addByBarcode(productCode);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -91,6 +99,76 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
         ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     }
+  }
+
+  // ✅ MÉTODO OPTIMIZADO PARA TU FORMATO DE QR
+  String _extractProductCodeFromScannedData(String scannedData) {
+    final cleanData = scannedData.trim();
+
+    print('🔍 [QR-PROCESSOR] Procesando: "${cleanData.substring(0, 50)}..."');
+
+    // Caso 1: Si es JSON (tu formato específico)
+    if (cleanData.startsWith('{') && cleanData.endsWith('}')) {
+      print('📝 [QR-PROCESSOR] Detectado JSON, buscando campo "codigo"...');
+      try {
+        final jsonData = jsonDecode(cleanData);
+
+        // ✅ PRIORIDAD 1: Buscar en este orden específico
+        final productCode =
+            jsonData['codigo'] ?? // Tu campo principal
+            jsonData['id'] ?? // ID numérico
+            jsonData['codigo_barra'] ?? // Código de barras
+            jsonData['barcode']; // Barcode alternativo
+
+        if (productCode != null) {
+          final codeStr = productCode.toString();
+          print('✅ [QR-PROCESSOR] Código extraído: "$codeStr"');
+          print('✅ [QR-PROCESSOR] Producto: ${jsonData['nombre']}');
+          print('✅ [QR-PROCESSOR] Precio: \$${jsonData['precio_venta']}');
+          return codeStr;
+        } else {
+          print('❌ [QR-PROCESSOR] No se encontró campo "codigo" en JSON');
+        }
+      } catch (e) {
+        print('❌ [QR-PROCESSOR] Error parseando JSON: $e');
+      }
+    }
+
+    // Caso 2: Si es solo números (código de barras normal)
+    if (RegExp(r'^\d+$').hasMatch(cleanData)) {
+      print('📊 [QR-PROCESSOR] Es código de barras numérico: $cleanData');
+      return cleanData;
+    }
+
+    // Caso 3: Si es una URL
+    if (cleanData.toLowerCase().contains('http')) {
+      print('🌐 [QR-PROCESSOR] Es URL, extrayendo código...');
+      try {
+        final uri = Uri.parse(cleanData);
+
+        // Buscar en path segments
+        for (final segment in uri.pathSegments) {
+          if (RegExp(r'^\d+$').hasMatch(segment)) {
+            print('✅ [QR-PROCESSOR] Código de URL: $segment');
+            return segment;
+          }
+        }
+
+        // Buscar en query parameters
+        final codeParam =
+            uri.queryParameters['codigo'] ?? uri.queryParameters['id'];
+        if (codeParam != null) {
+          print('✅ [QR-PROCESSOR] Código de query: $codeParam');
+          return codeParam;
+        }
+      } catch (e) {
+        print('❌ [QR-PROCESSOR] Error con URL: $e');
+      }
+    }
+
+    // Caso 4: Por defecto, usar el texto completo
+    print('🔍 [QR-PROCESSOR] Usando datos originales: "$cleanData"');
+    return cleanData;
   }
 
   Future<void> _finalizarVenta(BuildContext context) async {
