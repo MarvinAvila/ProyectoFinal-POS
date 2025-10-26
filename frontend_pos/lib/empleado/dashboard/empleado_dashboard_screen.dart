@@ -10,7 +10,7 @@ import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart';
 import 'product_search_dialog.dart';
 import 'package:frontend_pos/auth/auth_repository.dart';
 import 'package:frontend_pos/utils/jwt_utils.dart';
-import 'dart:convert'; 
+import 'dart:convert';
 
 class EmpleadoDashboardScreen extends StatefulWidget {
   const EmpleadoDashboardScreen({super.key});
@@ -64,6 +64,33 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
       return;
     }
 
+    // ✅ CORREGIDO: Validar longitud SOLO para códigos de barras, NO para JSON
+    final cleanData = code.trim();
+    if (cleanData.length > 30 &&
+        !(cleanData.startsWith('{') && cleanData.endsWith('}'))) {
+      print(
+        '⚠️ [SCANNER] Código de barras demasiado largo: ${cleanData.length} caracteres',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '⚠️ Código de barras muy largo (${cleanData.length} caracteres). Usa el QR o busca manualmente.',
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    // ✅ CORREGIDO: Validar código vacío
+    if (cleanData.isEmpty) {
+      print('⚠️ [SCANNER] Código vacío recibido');
+      return;
+    }
+
     setState(() {
       _lastScannedBarcode = code;
       _lastScanTime = now;
@@ -74,8 +101,29 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
       // ✅ NUEVO: Extraer código de producto (optimizado para tu formato QR)
       final String productCode = _extractProductCodeFromScannedData(code);
 
-      print('🔍 [SCANNER] Datos crudos: "$code"');
-      print('🔍 [SCANNER] Código procesado: "$productCode"');
+      print('🔍 [SCANNER] Datos crudos: "$code" (${code.length} caracteres)');
+      print(
+        '🔍 [SCANNER] Código procesado: "$productCode" (${productCode.length} caracteres)',
+      );
+
+      // ✅ CORREGIDO: Validar longitud del código procesado (no del original)
+      if (productCode.length > 30) {
+        print(
+          '⚠️ [SCANNER] Código procesado demasiado largo: ${productCode.length} caracteres',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '⚠️ El código del producto es muy largo. Usa búsqueda manual.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
 
       final success = await cart.addByBarcode(productCode);
 
@@ -93,19 +141,39 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      print('❌ [SCANNER] Error: $e');
+
+      // ✅ NUEVO: Manejo específico para errores de rango
+      if (e.toString().contains('range error') ||
+          e.toString().contains('invalid value')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '⚠️ Error de escáner: Código demasiado largo o formato inválido',
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+        }
       }
     }
   }
 
-  // ✅ MÉTODO OPTIMIZADO PARA TU FORMATO DE QR
+  // ✅ MÉTODO OPTIMIZADO PARA TU FORMATO DE QR (MANTENER IGUAL)
   String _extractProductCodeFromScannedData(String scannedData) {
     final cleanData = scannedData.trim();
 
-    print('🔍 [QR-PROCESSOR] Procesando: "${cleanData.substring(0, 50)}..."');
+    print(
+      '🔍 [QR-PROCESSOR] Procesando: "${cleanData.length > 50 ? cleanData.substring(0, 50) + '...' : cleanData}"',
+    );
 
     // Caso 1: Si es JSON (tu formato específico)
     if (cleanData.startsWith('{') && cleanData.endsWith('}')) {
@@ -122,7 +190,9 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
 
         if (productCode != null) {
           final codeStr = productCode.toString();
-          print('✅ [QR-PROCESSOR] Código extraído: "$codeStr"');
+          print(
+            '✅ [QR-PROCESSOR] Código extraído: "$codeStr" (${codeStr.length} caracteres)',
+          );
           print('✅ [QR-PROCESSOR] Producto: ${jsonData['nombre']}');
           print('✅ [QR-PROCESSOR] Precio: \$${jsonData['precio_venta']}');
           return codeStr;
