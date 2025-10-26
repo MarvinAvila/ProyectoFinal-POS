@@ -262,7 +262,95 @@ const productoController = {
       client.release();
     }
   },
+  /**
+   * Buscar producto por código de barras
+   * GET /api/productos/barcode/:code
+   */
+  async getByBarcode(req, res) {
+    const client = await db.getClient();
+    try {
+      const { code } = req.params;
 
+      // Validar que el código no esté vacío
+      if (!code || code.trim() === "") {
+        return responseHelper.error(
+          res,
+          "Código de barras no puede estar vacío",
+          400
+        );
+      }
+
+      // Buscar producto por código de barras
+      const result = await client.query(
+        `SELECT p.*, 
+              c.nombre as categoria_nombre, 
+              pr.nombre as proveedor_nombre,
+              pr.contacto as proveedor_contacto
+       FROM productos p
+       LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+       LEFT JOIN proveedores pr ON p.id_proveedor = pr.id_proveedor
+       WHERE p.codigo_barra = $1 AND p.activo = true`,
+        [code.trim()]
+      );
+
+      if (result.rows.length === 0) {
+        return responseHelper.notFound(
+          res,
+          "Producto con ese código de barras"
+        );
+      }
+
+      const producto = ModelMapper.toProducto(result.rows[0]);
+      const productoModel = new Producto(
+        producto.id_producto,
+        producto.nombre,
+        producto.codigo_barra,
+        producto.precio_compra,
+        producto.precio_venta,
+        producto.stock,
+        producto.unidad,
+        producto.fecha_caducidad,
+        producto.id_proveedor,
+        producto.id_categoria,
+        producto.imagen,
+        producto.codigo_barras_url,
+        producto.codigo_qr_url,
+        producto.codigos_public_ids
+      );
+
+      // Información enriquecida
+      const productoEnriquecido = {
+        ...producto,
+        categoria_nombre: result.rows[0].categoria_nombre,
+        proveedor_nombre: result.rows[0].proveedor_nombre,
+        proveedor_contacto: result.rows[0].proveedor_contacto,
+        necesita_reposicion: productoModel.necesitaReposicion(),
+        por_caducar: productoModel.estaPorCaducar(),
+        margen_ganancia: productoModel.margenGanancia(),
+        ganancia_unitaria: productoModel.calcularGanancia(),
+        estado_stock: productoModel.getEstadoStock(),
+        dias_para_caducar: productoModel.diasParaCaducar(),
+        es_rentable: productoModel.esRentable(),
+      };
+
+      logger.api("Producto encontrado por código de barras", {
+        producto_id: producto.id_producto,
+        codigo_barra: code,
+      });
+
+      return responseHelper.success(res, productoEnriquecido);
+    } catch (error) {
+      logger.error("Error en productoController.getByBarcode", error);
+      return responseHelper.error(
+        res,
+        "Error buscando producto por código de barras",
+        500,
+        error
+      );
+    } finally {
+      client.release();
+    }
+  },
   // 🟣 Crear producto (sin stock_minimo)
   async create(req, res) {
     const client = await db.getClient();

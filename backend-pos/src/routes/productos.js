@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const productoController = require("../controllers/productoController");
 const authMiddleware = require("../middleware/auth");
-const upload = require('../middleware/uploadMiddleware');
+const upload = require("../middleware/uploadMiddleware");
 
 // Todas las rutas requieren autenticación
 router.use(authMiddleware.verifyToken);
@@ -14,10 +14,13 @@ router.get("/", productoController.getAll);
 router.get("/stats", productoController.getStats);
 
 // GET /productos/:id/codes - Obtener códigos de un producto
-router.get(
-  "/:id/codes",
-  productoController.getProductCodes
-);
+router.get("/:id/codes", productoController.getProductCodes);
+
+// GET /productos/barcode/:code - Buscar producto por código de barras
+router.get("/barcode/:code", productoController.getByBarcode);
+
+// GET /productos/:id - Obtener producto por ID
+router.get("/:id", productoController.getById);
 
 // POST /productos/:id/regenerate-codes - Regenerar códigos
 router.post(
@@ -25,9 +28,6 @@ router.post(
   authMiddleware.requireRole(["admin", "dueno"]),
   productoController.regenerateCodes
 );
-
-// GET /productos/:id - Obtener producto por ID
-router.get("/:id", productoController.getById);
 
 // POST /productos - Crear nuevo producto
 router.post(
