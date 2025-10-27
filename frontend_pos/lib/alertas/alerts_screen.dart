@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -34,10 +35,7 @@ class AlertsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // El backend ya debe filtrar solo las alertas vigentes (stock bajo actual)
-      // 🔹 Usamos el endpoint de pendientes para enfocarnos en lo accionable
       final data = await _api.get(Endpoints.alertasPendientes);
-      // ✅ FIX: Dividir la expresión para evitar confusión del linter
       final rawResponse = asMap(data);
       final rawAlertsList = rawResponse['alertas'];
       final list = asList(rawAlertsList);
@@ -56,12 +54,7 @@ class AlertsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // ✅ FIX: El segundo argumento 'data' debe ser nombrado.
-      await _api.patch(
-        '${Endpoints.alertas}/$id/atendida',
-        data: {},
-      );
-      // Quitar la alerta de la lista local para que la UI se actualice al instante
+      await _api.patch('${Endpoints.alertas}/$id/atendida', data: {});
       _items.removeWhere((item) => item.id == id);
       return true;
     } on ApiError catch (e) {
@@ -105,7 +98,6 @@ class _AlertsViewState extends State<_AlertsView> {
   @override
   void initState() {
     super.initState();
-    // Refrescar cada 20 segundos
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctrl = context.read<AlertsController>();
       _autoRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
@@ -125,96 +117,224 @@ class _AlertsViewState extends State<_AlertsView> {
     final ctrl = context.watch<AlertsController>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Alertas'),
-        actions: [
-          IconButton(
-            tooltip: 'Actualizar',
-            onPressed: ctrl.loading ? null : ctrl.refresh,
-            icon: const Icon(Icons.refresh),
+      // 🌌 Fondo azul con degradado
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0A0E21), // azul noche
+              Color(0xFF0F172A), // marino oscuro
+              Color(0xFF1E293B), // gris azulado
+            ],
           ),
-        ],
-      ),
-      body: Builder(
-        builder: (context) {
-          if (ctrl.loading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (ctrl.error != null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline, size: 40),
-                    const SizedBox(height: 8),
-                    Text('Error: ${ctrl.error}', textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: ctrl.refresh,
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 💎 AppBar tipo glass con botón de regreso y refresh
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(16),
                 ),
-              ),
-            );
-          }
-
-          final items = ctrl.items;
-          if (items.isEmpty) {
-            return const Center(child: Text('Sin alertas activas'));
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.all(8),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 6),
-            itemBuilder: (context, i) {
-              final a = items[i];
-              final isCad = a.type == AlertType.caducidad;
-              final leadingIcon = isCad ? Icons.timer_outlined : Icons.warning;
-
-              return Opacity(
-                opacity: a.attended ? 0.5 : 1.0,
-                child: Card(
-                  elevation: a.attended ? 1 : 3,
-                  child: ListTile(
-                    leading: Icon(
-                      leadingIcon,
-                      color: isCad ? Colors.orange : Colors.redAccent,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Container(
+                    height: kToolbarHeight,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.white.withOpacity(0.15),
+                          width: 0.6,
+                        ),
+                      ),
                     ),
-                    title: Text(a.message),
-                    subtitle: Text(
-                      [
-                        alertTypeToText(a.type),
-                        if (a.productName?.isNotEmpty == true)
-                          '• ${a.productName}',
-                        '• ${ctrl.formatDate(a.date)}',
-                        if (a.productId != null) '• Prod #${a.productId}',
-                      ].join(' '),
-                    ),
-                    // ✅ Botón para marcar como atendida
-                    trailing: a.attended
-                        ? const Icon(Icons.check_circle, color: Colors.green)
-                        : TextButton(
-                            onPressed: () async {
-                              final success = await ctrl.marcarAtendida(a.id);
-                              if (success) {
-                                // ✅ FIX: Verificar context.mounted explícitamente después de await
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Alerta atendida')));
-                              }
-                            },
-                            child: const Text('Atender'),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // 🔙 Botón de regreso
+                        IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
                           ),
+                          tooltip: 'Regresar',
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const Text(
+                          'Alertas',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 20,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Actualizar',
+                          onPressed: ctrl.loading ? null : ctrl.refresh,
+                          icon: const Icon(Icons.refresh, color: Colors.white),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              );
-            },
-          );
-        },
+              ),
+
+              // 📋 Contenido de alertas
+              Expanded(
+                child: Builder(
+                  builder: (context) {
+                    if (ctrl.loading) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      );
+                    }
+
+                    if (ctrl.error != null) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 40,
+                                color: Colors.white70,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Error: ${ctrl.error}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              const SizedBox(height: 12),
+                              FilledButton(
+                                onPressed: ctrl.refresh,
+                                child: const Text('Reintentar'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    final items = ctrl.items;
+                    if (items.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'Sin alertas activas',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      itemBuilder: (context, i) {
+                        final a = items[i];
+                        final isCad = a.type == AlertType.caducidad;
+                        final leadingIcon =
+                            isCad ? Icons.timer_outlined : Icons.warning;
+
+                        return Opacity(
+                          opacity: a.attended ? 0.5 : 1.0,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Colors.white.withOpacity(0.1),
+                                      Colors.white.withOpacity(0.03),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.15),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.25),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ListTile(
+                                  leading: Icon(
+                                    leadingIcon,
+                                    color:
+                                        isCad
+                                            ? Colors.orangeAccent
+                                            : Colors.redAccent,
+                                  ),
+                                  title: Text(
+                                    a.message,
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  subtitle: Text(
+                                    [
+                                      alertTypeToText(a.type),
+                                      '• ${ctrl.formatDate(a.date)}',
+                                      if (a.productId != null)
+                                        '• Prod #${a.productId}',
+                                    ].join(' '),
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  trailing:
+                                      a.attended
+                                          ? const Icon(
+                                            Icons.check_circle,
+                                            color: Colors.greenAccent,
+                                          )
+                                          : TextButton(
+                                            onPressed: () async {
+                                              final success = await ctrl
+                                                  .marcarAtendida(a.id);
+                                              if (success && context.mounted) {
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Alerta atendida',
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            child: const Text(
+                                              'Atender',
+                                              style: TextStyle(
+                                                color: Color(0xFFB388FF),
+                                              ),
+                                            ),
+                                          ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

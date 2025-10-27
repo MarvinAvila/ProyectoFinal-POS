@@ -5,7 +5,7 @@ import 'product_repository.dart';
 import 'product_model.dart';
 import '../../empleado/carrito/cart_controller.dart';
 import 'package:frontend_pos/core/widgets.dart';
-import 'add_product_screen.dart'; 
+import 'add_product_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});

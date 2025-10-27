@@ -15,6 +15,7 @@ import '../categorias/category_model.dart'; // ✅ 1. Importar modelo
 import '../categorias/category_repository.dart'; // ✅ 2. Importar repositorio
 import '../categorias/category_form.dart'; // ✅ 3. Importar formulario de categoría
 import '../../utils/image_picker_utils.dart';
+import 'dart:ui';
 
 class AddProductScreen extends StatefulWidget {
   final Product? product;
@@ -492,202 +493,310 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final bool isEdit = widget.product != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F5FF),
-      appBar: AppBar(
-        title: Text(isEdit ? 'Editar producto' : 'Agregar producto'),
-        backgroundColor: const Color(0xFF6A1B9A),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 32),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildImagePicker(), // 🆕 Este método ya fue actualizado
-              const SizedBox(height: 24),
-
-              // 🟣 Código de barras
-              TextFormField(
-                controller: _codigoCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Código de barras',
-                  hintText: 'Escanea o escribe manualmente el código',
-                  suffixIcon: IconButton(
-                    icon: const Icon(
-                      Icons.qr_code_scanner,
-                      color: Color(0xFF6A1B9A),
-                    ),
-                    tooltip: 'Escanear código',
-                    onPressed: _scanBarcode,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                // ✅ CAMBIO: El código de barras ya no es obligatorio
-                validator: null,
-              ),
-              const SizedBox(height: 16),
-
-              _buildField(_nombreCtrl, 'Nombre del producto'),
-
-              _buildField(
-                _precioCompraCtrl,
-                'Precio de compra',
-                keyboard: TextInputType.number,
-              ),
-
-              _buildField(
-                _precioCtrl,
-                'Precio de venta',
-                keyboard: TextInputType.number,
-              ),
-
-              _buildField(
-                _stockCtrl,
-                'Stock disponible',
-                keyboard: TextInputType.number,
-              ),
-
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: DropdownButtonFormField<String>(
-                  value: _unidadSeleccionada,
-                  decoration: InputDecoration(
-                    labelText: 'Unidad',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'pieza', child: Text('Pieza')),
-                    DropdownMenuItem(value: 'kg', child: Text('Kilogramo')),
-                    DropdownMenuItem(value: 'lt', child: Text('Litro')),
-                    DropdownMenuItem(value: 'otro', child: Text('Otro')),
-                  ],
-                  onChanged: (v) => setState(() => _unidadSeleccionada = v),
-                  validator: (v) => v == null ? 'Seleccione una unidad' : null,
-                ),
-              ),
-
-              // ✅ 8. Reemplazar el campo de texto por un Dropdown con botón de "Agregar"
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        value: _idCategoriaSeleccionada,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: 'Categoría',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          suffixIcon:
-                              _loadingCategories
-                                  ? const Padding(
-                                    padding: EdgeInsets.all(12.0),
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                  )
-                                  : null,
-                        ),
-                        items:
-                            _categorias.map((cat) {
-                              return DropdownMenuItem(
-                                value: cat.idCategoria,
-                                child: Text(cat.nombre),
-                              );
-                            }).toList(),
-                        onChanged:
-                            (v) => setState(() => _idCategoriaSeleccionada = v),
-                        validator:
-                            (v) =>
-                                v == null ? 'Seleccione una categoría' : null,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // ✅ 9. Botón para crear una nueva categoría
-                    IconButton.filled(
-                      icon: const Icon(Icons.add),
-                      tooltip: 'Nueva Categoría',
-                      style: IconButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: _crearNuevaCategoria,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // 🆕 BOTÓN DE REGENERAR (solo en modo edición)
-              if (isEdit)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 24.0),
-                  child: Center(
-                    child: OutlinedButton.icon(
-                      onPressed: _loading ? null : _regenerateCodes,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Regenerar Códigos (QR y Barras)'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orange.shade800,
-                        side: BorderSide(color: Colors.orange.shade800),
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Botón de Guardar/Actualizar
-              Center(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6A1B9A),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: _loading ? null : _saveProduct,
-                  icon: const Icon(Icons.save, color: Colors.white),
-                  label:
-                      _loading
-                          ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                          : Text(
-                            isEdit ? 'Actualizar producto' : 'Guardar producto',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                ),
-              ),
+      // 🎨 Misma paleta que AdminDashboardScreen
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0A0E21), // azul noche base
+              Color(0xFF0F172A), // azul marino profundo
+              Color(0xFF1E293B), // gris azulado
             ],
+          ),
+        ),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.topRight,
+              radius: 1.4,
+              colors: [
+                Color(0xFF1E3A8A), // azul intenso
+                Color.fromARGB(255, 9, 24, 66), // azul brillante neón
+                Color.fromARGB(255, 4, 26, 85), // violeta moderno
+                Colors.transparent,
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // 🔵 AppBar simple (igual estructura, solo color adaptado)
+                AppBar(
+                  title: Text(isEdit ? 'Editar producto' : 'Agregar producto'),
+                  backgroundColor: const Color(0xFF1E293B).withOpacity(0.9),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+
+                // 🧩 Cuerpo del formulario (sin cambios)
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(isMobile ? 16 : 32),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildImagePicker(),
+                          const SizedBox(height: 24),
+
+                          // 🟦 Campos y controles
+                          TextFormField(
+                            controller: _codigoCtrl,
+                            decoration: InputDecoration(
+                              labelText: 'Código de barras',
+                              hintText:
+                                  'Escanea o escribe manualmente el código',
+                              suffixIcon: IconButton(
+                                icon: const Icon(
+                                  Icons.qr_code_scanner,
+                                  color: Color(0xFF60A5FA), // azul suave
+                                ),
+                                tooltip: 'Escanear código',
+                                onPressed: _scanBarcode,
+                              ),
+                              labelStyle: const TextStyle(
+                                color: Color(0xFFCBD5E1),
+                              ),
+                              hintStyle: const TextStyle(
+                                color: Color.fromARGB(255, 249, 250, 252),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.05),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF60A5FA),
+                                ),
+                              ),
+                              focusedBorder: const OutlineInputBorder(
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(12),
+                                ),
+                                borderSide: BorderSide(
+                                  color: Color(0xFF60A5FA),
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          const SizedBox(height: 16),
+
+                          _buildField(_nombreCtrl, 'Nombre del producto'),
+                          _buildField(
+                            _precioCompraCtrl,
+                            'Precio de compra',
+                            keyboard: TextInputType.number,
+                          ),
+                          _buildField(
+                            _precioCtrl,
+                            'Precio de venta',
+                            keyboard: TextInputType.number,
+                          ),
+                          _buildField(
+                            _stockCtrl,
+                            'Stock disponible',
+                            keyboard: TextInputType.number,
+                          ),
+
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: DropdownButtonFormField<String>(
+                              value: _unidadSeleccionada,
+                              decoration: InputDecoration(
+                                labelText: 'Unidad',
+                                labelStyle: const TextStyle(
+                                  color: Color(0xFFCBD5E1),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.05),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              dropdownColor: const Color(0xFF1E293B),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'pieza',
+                                  child: Text('Pieza'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'kg',
+                                  child: Text('Kilogramo'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'lt',
+                                  child: Text('Litro'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'otro',
+                                  child: Text('Otro'),
+                                ),
+                              ],
+                              onChanged:
+                                  (v) =>
+                                      setState(() => _unidadSeleccionada = v),
+                              validator:
+                                  (v) =>
+                                      v == null
+                                          ? 'Seleccione una unidad'
+                                          : null,
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<int>(
+                                    value: _idCategoriaSeleccionada,
+                                    isExpanded: true,
+                                    decoration: InputDecoration(
+                                      labelText: 'Categoría',
+                                      labelStyle: const TextStyle(
+                                        color: Color(0xFFCBD5E1),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.05),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      suffixIcon:
+                                          _loadingCategories
+                                              ? const Padding(
+                                                padding: EdgeInsets.all(12.0),
+                                                child: SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: Color(
+                                                          0xFF60A5FA,
+                                                        ),
+                                                      ),
+                                                ),
+                                              )
+                                              : null,
+                                    ),
+                                    dropdownColor: const Color(0xFF1E293B),
+                                    items:
+                                        _categorias.map((cat) {
+                                          return DropdownMenuItem(
+                                            value: cat.idCategoria,
+                                            child: Text(cat.nombre),
+                                          );
+                                        }).toList(),
+                                    onChanged:
+                                        (v) => setState(
+                                          () => _idCategoriaSeleccionada = v,
+                                        ),
+                                    validator:
+                                        (v) =>
+                                            v == null
+                                                ? 'Seleccione una categoría'
+                                                : null,
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton.filled(
+                                  icon: const Icon(Icons.add),
+                                  tooltip: 'Nueva Categoría',
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: const Color(
+                                      0xFF3B82F6,
+                                    ), // azul eléctrico
+                                    padding: const EdgeInsets.all(16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  onPressed: _crearNuevaCategoria,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          if (isEdit)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 24.0),
+                              child: Center(
+                                child: OutlinedButton.icon(
+                                  onPressed: _loading ? null : _regenerateCodes,
+                                  icon: const Icon(
+                                    Icons.refresh,
+                                    color: Color(0xFF60A5FA),
+                                  ),
+                                  label: const Text(
+                                    'Regenerar Códigos (QR y Barras)',
+                                    style: TextStyle(
+                                      color: Color(0xFF60A5FA),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(
+                                      color: Color(0xFF60A5FA),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          Center(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(
+                                  0xFF3B82F6,
+                                ), // azul principal
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 30,
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: _loading ? null : _saveProduct,
+                              icon: const Icon(Icons.save, color: Colors.white),
+                              label:
+                                  _loading
+                                      ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                      : Text(
+                                        isEdit
+                                            ? 'Actualizar producto'
+                                            : 'Guardar producto',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -728,9 +837,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
       child: TextFormField(
         controller: c,
         keyboardType: keyboard,
+        style: const TextStyle(
+          color: Colors.white, // 🔥 texto blanco siempre al escribir
+          fontWeight: FontWeight.w500,
+        ),
+        cursorColor: Colors.white, // 🔥 cursor blanco
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          labelStyle: const TextStyle(
+            color: Colors.white70, // Blanco suave cuando está vacío
+          ),
+          hintStyle: const TextStyle(
+            color: Colors.white60, // Blanco tenue si usas hintText
+          ),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.05),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: Color(0xFF60A5FA), // Azul del tema
+            ),
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide(color: Color(0xFF60A5FA), width: 1.5),
+          ),
         ),
         validator: (v) => v!.isEmpty ? 'Campo obligatorio' : null,
       ),
