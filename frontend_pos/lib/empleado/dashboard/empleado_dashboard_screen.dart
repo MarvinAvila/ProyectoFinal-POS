@@ -11,6 +11,7 @@ import 'product_search_dialog.dart';
 import 'package:frontend_pos/auth/auth_repository.dart';
 import 'package:frontend_pos/utils/jwt_utils.dart';
 import 'dart:convert';
+import 'dart:ui';
 
 class EmpleadoDashboardScreen extends StatefulWidget {
   const EmpleadoDashboardScreen({super.key});
@@ -426,99 +427,159 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
     final currency = NumberFormat.simpleCurrency(locale: 'es_MX');
     final cart = context.watch<CartController>();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0F0F7),
-      appBar: AppBar(
-        title: const Text('Punto de Venta'),
-        backgroundColor: Colors.deepPurple,
-        actions:
-            kIsWeb
-                ? [] // En web, sin controles de cámara
-                : [
-                  // En móvil, controles simplificados sin torchState
-                  IconButton(
-                    icon: const Icon(Icons.flash_on),
-                    onPressed: () {
-                      _cameraController?.toggleTorch();
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.flip_camera_ios),
-                    onPressed: () {
-                      _cameraController?.switchCamera();
-                    },
-                  ),
-                ],
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment.topRight,
+          radius: 1.3,
+          colors: [
+            Color(0xFF0A0E21), // azul profundo
+            Color(0xFF1A237E), // azul neón oscuro
+          ],
+        ),
       ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 🟢 SECCIÓN DE ESCANEO (CÁMARA Y MANUAL)
-          Expanded(
-            flex: isMobile ? 1 : 2,
-            child: Column(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: _buildScanner(),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: ClipRRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: AppBar(
+                title: const Text('Punto de Venta'),
+                centerTitle: true,
+                elevation: 0,
+                backgroundColor: Colors.white.withOpacity(0.08),
+                foregroundColor: Colors.white,
+                actions:
+                    kIsWeb
+                        ? []
+                        : [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.flash_on,
+                              color: Colors.cyanAccent,
+                            ),
+                            onPressed: () => _cameraController?.toggleTorch(),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.flip_camera_ios,
+                              color: Colors.cyanAccent,
+                            ),
+                            onPressed: () => _cameraController?.switchCamera(),
+                          ),
+                        ],
+              ),
+            ),
+          ),
+        ),
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 🔵 SECCIÓN ESCÁNER
+            Expanded(
+              flex: isMobile ? 1 : 2,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: _buildScanner(),
+                      ),
+                    ),
+                  ),
+                  _buildManualEntry(),
+                ],
+              ),
+            ),
+
+            // 🛒 PANEL CARRITO
+            if (!isMobile)
+              Expanded(
+                flex: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blueAccent.withOpacity(0.25),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: _buildCarrito(context, currency),
+                ),
+              ),
+          ],
+        ),
+
+        // 💬 FABs flotantes: Chatbot y carrito móvil
+        floatingActionButton: Stack(
+          children: [
+            if (isMobile && cart.lines.isNotEmpty)
+              Positioned(
+                bottom: 80,
+                right: 16,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: FloatingActionButton.extended(
+                      backgroundColor: Colors.white.withOpacity(0.1),
+                      icon: const Icon(
+                        Icons.shopping_cart,
+                        color: Colors.cyanAccent,
+                      ),
+                      label: Text(
+                        currency.format(cart.total),
+                        style: const TextStyle(color: Colors.cyanAccent),
+                      ),
+                      onPressed: () => _mostrarCarritoMovil(context),
                     ),
                   ),
                 ),
-                _buildManualEntry(),
-              ],
-            ),
-          ),
-
-          // 🟣 SECCIÓN CARRITO (oculta en pantallas pequeñas)
-          if (!isMobile)
-            Expanded(flex: 1, child: _buildCarrito(context, currency)),
-        ],
-      ),
-
-      // 💬 Chatbot flotante + 🟠 Carrito flotante móvil
-      floatingActionButton: Stack(
-        children: [
-          if (isMobile && cart.lines.isNotEmpty)
+              ),
             Positioned(
-              bottom: 80,
-              right: 16,
-              child: FloatingActionButton.extended(
-                onPressed: () => _mostrarCarritoMovil(context),
-                backgroundColor: Colors.deepPurple,
-                icon: const Icon(Icons.shopping_cart),
-                label: Text(currency.format(cart.total)),
+              bottom: 35,
+              right: 50,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: FloatingActionButton(
+                    heroTag: 'chatbot_empleado',
+                    backgroundColor: Colors.white.withOpacity(0.08),
+                    tooltip: 'Abrir Chatbot',
+                    elevation: 6,
+                    child: const Icon(Icons.chat, color: Colors.cyanAccent),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.white.withOpacity(0.9),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
+                        ),
+                        builder:
+                            (_) => const SizedBox(
+                              height: 600,
+                              child: ChatbotScreen(),
+                            ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
-          Positioned(
-            bottom: 16,
-            left: 24,
-            child: FloatingActionButton(
-              heroTag: 'chatbot_empleado',
-              backgroundColor: Colors.deepPurple,
-              tooltip: 'Abrir Chatbot',
-              elevation: 6,
-              child: const Icon(Icons.chat, color: Colors.white),
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  builder:
-                      (_) =>
-                          const SizedBox(height: 600, child: ChatbotScreen()),
-                );
-              },
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -633,12 +694,18 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
           // ✅ CAMPO DE CÓDIGO MANUAL (existente)
           TextField(
             controller: _manualBarcodeController,
+            style: const TextStyle(
+              color: Colors.white,
+            ), // ✅ texto ingresado blanco
+            cursorColor: Colors.cyanAccent, // ✅ cursor azul neón
             decoration: InputDecoration(
               labelText: 'Ingresar código manualmente',
               hintText: 'Escribe el código y presiona Enter',
-              prefixIcon: const Icon(Icons.qr_code),
+              labelStyle: const TextStyle(color: Colors.cyanAccent),
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+              prefixIcon: const Icon(Icons.qr_code, color: Colors.cyanAccent),
               suffixIcon: IconButton(
-                icon: const Icon(Icons.send),
+                icon: const Icon(Icons.send, color: Colors.cyanAccent),
                 onPressed: () {
                   final code = _manualBarcodeController.text.trim();
                   if (code.isNotEmpty) {
@@ -647,9 +714,23 @@ class _EmpleadoDashboardScreenState extends State<EmpleadoDashboardScreen> {
                   }
                 },
               ),
-              border: OutlineInputBorder(
+              enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Colors.cyanAccent.withOpacity(0.5),
+                ),
               ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Colors.cyanAccent,
+                  width: 1.5,
+                ),
+              ),
+              filled: true,
+              fillColor: Colors.white.withOpacity(
+                0.05,
+              ), // sutil fondo translúcido
             ),
             onSubmitted: _processBarcode,
           ),
