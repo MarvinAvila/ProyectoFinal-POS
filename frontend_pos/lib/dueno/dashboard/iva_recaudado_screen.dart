@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend_pos/core/http.dart';
+import 'dart:ui';
 
 class IvaRecaudadoScreen extends StatefulWidget {
   const IvaRecaudadoScreen({super.key});
@@ -44,28 +45,69 @@ class _IvaRecaudadoScreenState extends State<IvaRecaudadoScreen> {
   Widget build(BuildContext context) {
     final mx = NumberFormat.simpleCurrency(locale: 'es_MX');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('IVA Recaudado'),
-        backgroundColor: const Color(0xFF4A148C),
-        foregroundColor: Colors.white,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment.topRight,
+          radius: 1.2,
+          colors: [
+            Color(0xFF0A0E21), // azul profundo
+            Color(0xFF1A237E), // azul neón oscuro
+          ],
+        ),
       ),
-      backgroundColor: const Color(0xFFF5F0FA),
-      body:
-          loading
-              ? const Center(child: CircularProgressIndicator())
-              : error != null
-              ? Center(child: Text('Error: $error'))
-              : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // 🧾 Total IVA general
-                  Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 3,
-                    child: Padding(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: ClipRRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: AppBar(
+                title: const Text('IVA Recaudado'),
+                centerTitle: true,
+                elevation: 0,
+                backgroundColor: Colors.white.withOpacity(0.08),
+                foregroundColor: Colors.white,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ),
+        ),
+        body:
+            loading
+                ? const Center(
+                  child: CircularProgressIndicator(color: Colors.cyanAccent),
+                )
+                : error != null
+                ? Center(
+                  child: Text(
+                    'Error: $error',
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
+                )
+                : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // 🧾 Total IVA general
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blueAccent.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,7 +115,7 @@ class _IvaRecaudadoScreenState extends State<IvaRecaudadoScreen> {
                           const Text(
                             'Total IVA Recaudado',
                             style: TextStyle(
-                              color: Color(0xFF4A148C),
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
                             ),
@@ -82,38 +124,41 @@ class _IvaRecaudadoScreenState extends State<IvaRecaudadoScreen> {
                           Text(
                             mx.format(_calcularTotalIva()),
                             style: const TextStyle(
-                              fontSize: 26,
+                              fontSize: 30,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF311B92),
+                              color: Colors.cyanAccent,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Detalle de Ventas con IVA',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4A148C),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  if (ventas.isEmpty)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text('No hay ventas registradas con IVA.'),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Detalle de Ventas con IVA',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                    )
-                  else
-                    ...ventas.map((v) => _buildVentaCard(v, mx)),
-                ],
-              ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    if (ventas.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(
+                          child: Text(
+                            'No hay ventas registradas con IVA.',
+                            style: TextStyle(color: Colors.white60),
+                          ),
+                        ),
+                      )
+                    else
+                      ...ventas.map((v) => _buildVentaCard(v, mx)),
+                  ],
+                ),
+      ),
     );
   }
 
@@ -136,14 +181,30 @@ class _IvaRecaudadoScreenState extends State<IvaRecaudadoScreen> {
     final iva =
         (v['iva'] is num) ? v['iva'] : double.tryParse('${v['iva'] ?? 0}') ?? 0;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
       child: ListTile(
-        leading: const Icon(Icons.receipt_long, color: Color(0xFF4A148C)),
-        title: Text(mx.format(iva)),
-        subtitle: Text('${v['forma_pago'] ?? 'N/A'}  •  $fecha'),
-        trailing: Text('#${v['id_venta'] ?? ''}'),
+        leading: const Icon(Icons.receipt_long, color: Colors.cyanAccent),
+        title: Text(
+          mx.format(iva),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text(
+          '${v['forma_pago'] ?? 'N/A'}  •  $fecha',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        trailing: Text(
+          '#${v['id_venta'] ?? ''}',
+          style: const TextStyle(color: Colors.white54),
+        ),
       ),
     );
   }

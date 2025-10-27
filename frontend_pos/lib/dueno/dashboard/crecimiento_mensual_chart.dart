@@ -14,7 +14,7 @@ class CrecimientoMensualChart extends StatelessWidget {
       return const Center(
         child: Text(
           "📉 Sin datos de crecimiento disponibles",
-          style: TextStyle(color: Colors.grey),
+          style: TextStyle(color: Colors.white60),
         ),
       );
     }
@@ -31,8 +31,19 @@ class CrecimientoMensualChart extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       child: LineChart(
         LineChartData(
-          gridData: FlGridData(show: true, drawVerticalLine: false),
-          borderData: FlBorderData(show: true),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine:
+                (value) => FlLine(
+                  color: Colors.white.withOpacity(0.15),
+                  strokeWidth: 1,
+                ),
+          ),
+          borderData: FlBorderData(
+            show: true,
+            border: Border.all(color: Colors.white24, width: 1),
+          ),
           titlesData: FlTitlesData(
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
@@ -41,7 +52,10 @@ class CrecimientoMensualChart extends StatelessWidget {
                 getTitlesWidget: (value, meta) {
                   return Text(
                     currency.format(value),
-                    style: const TextStyle(fontSize: 10, color: Colors.purple),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF80D8FF), // azul cielo claro
+                    ),
                   );
                 },
               ),
@@ -56,7 +70,8 @@ class CrecimientoMensualChart extends StatelessWidget {
                       datos[i].mes,
                       style: const TextStyle(
                         fontSize: 11,
-                        color: Colors.purple,
+                        color: Color(0xFF82B1FF), // azul-violeta neón
+                        fontWeight: FontWeight.bold,
                       ),
                     );
                   }
@@ -64,22 +79,46 @@ class CrecimientoMensualChart extends StatelessWidget {
                 },
               ),
             ),
+            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
           minY: minIngreso * 0.8,
           maxY: maxIngreso * 1.2,
           lineBarsData: [
             LineChartBarData(
               isCurved: true,
-              color: Colors.deepPurple,
-              barWidth: 3,
-              dotData: FlDotData(show: true),
+              barWidth: 4,
+              dotData: FlDotData(
+                show: true,
+                getDotPainter:
+                    (spot, _, __, ___) => FlDotCirclePainter(
+                      radius: 5,
+                      color: const Color(0xFF00E5FF), // cian brillante
+                      strokeWidth: 2,
+                      strokeColor: Colors.white,
+                    ),
+              ),
               belowBarData: BarAreaData(
                 show: true,
-                color: Colors.deepPurpleAccent.withOpacity(0.2),
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF00B0FF).withOpacity(0.35),
+                    const Color(0xFF311B92).withOpacity(0.1),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
-              spots: List.generate(datos.length, (i) {
-                return FlSpot(i.toDouble(), datos[i].ingresos);
-              }),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF00E5FF), // cian
+                  Color(0xFF82B1FF), // azul claro
+                ],
+              ),
+              spots: List.generate(
+                datos.length,
+                (i) => FlSpot(i.toDouble(), datos[i].ingresos),
+              ),
             ),
           ],
         ),

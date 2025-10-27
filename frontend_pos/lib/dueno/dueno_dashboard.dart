@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:frontend_pos/dueno/dashboard/iva_recaudado_screen.dart';
 import 'package:frontend_pos/dueno/dashboard/promedio_venta_screen.dart';
@@ -6,7 +7,6 @@ import 'package:frontend_pos/core/http.dart';
 import 'package:frontend_pos/dueno/dashboard/dueno_repository.dart';
 import 'package:frontend_pos/alertas/alerts_screen.dart';
 import 'package:frontend_pos/admin/ventas/ventas_screen.dart';
-import 'package:frontend_pos/gerente/ventas/top_productos_screen.dart';
 import 'package:frontend_pos/dueno/dashboard/crecimiento_mensual_chart.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:frontend_pos/chatbot/screens/chatbot_screen.dart';
@@ -20,7 +20,7 @@ class DuenoDashboard extends StatefulWidget {
 
 class _DuenoDashboardState extends State<DuenoDashboard> {
   final repo = DuenoDashboardRepository();
-  DuenoDashboardData? _dashboardData; // ✅ Cambiar late Future por nullable
+  DuenoDashboardData? _dashboardData;
   bool _isLoading = true;
   String? _error;
 
@@ -36,9 +36,7 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
         _isLoading = true;
         _error = null;
       });
-
       final data = await repo.fetchDashboard();
-
       setState(() {
         _dashboardData = data;
         _isLoading = false;
@@ -48,290 +46,217 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
         _isLoading = false;
         _error = error.toString();
       });
-      print('Error loading dashboard: $error');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 700;
-    final currency = NumberFormat.simpleCurrency(locale: 'es_MX');
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F0FA),
-      appBar: AppBar(
-        title: const Text('Panel del Dueño'),
-        backgroundColor: const Color(0xFF4A148C),
-        foregroundColor: Colors.white,
-        elevation: 0,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment.topRight,
+          radius: 1.2,
+          colors: [Color(0xFF0A0E21), Color(0xFF1A237E)],
+        ),
       ),
-
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Error: $_error',
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _loadDashboard,
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
-                ),
-              )
-              : RefreshIndicator(
-                onRefresh: _loadDashboard,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildWelcomePanel(context, isMobile),
-                      const SizedBox(height: 24),
-
-                      // 🟦 MENÚ HORIZONTAL DEL DUEÑO
-                      Container(
-                        margin: const EdgeInsets.only(top: 8, bottom: 20),
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF311B92),
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.deepPurple.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          children: [
-                            _buildTopButton(
-                              context,
-                              icon: Icons.receipt_long_outlined,
-                              label: 'Ventas',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const VentasScreen(),
-                                  ),
-                                ).then((_) => _loadDashboard());
-                              },
-                            ),
-                            _buildTopButton(
-                              context,
-                              icon: Icons.account_balance_wallet_outlined,
-                              label: 'IVA',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const IvaRecaudadoScreen(),
-                                  ),
-                                ).then((_) => _loadDashboard());
-                              },
-                            ),
-                            _buildTopButton(
-                              context,
-                              icon: Icons.trending_up,
-                              label: 'Promedio',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PromedioVentaScreen(),
-                                  ),
-                                ).then((_) => _loadDashboard());
-                              },
-                            ),
-                            _buildTopButton(
-                              context,
-                              icon: Icons.warning_amber_rounded,
-                              label: 'Alertas',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const AlertsScreen(),
-                                  ),
-                                ).then((_) => _loadDashboard());
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-                      _buildSectionTitle('Crecimiento Mensual'),
-                      Container(
-                        margin: const EdgeInsets.only(top: 12),
-                        height: 350,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.purple.shade100.withOpacity(0.3),
-                              blurRadius: 6,
-                              offset: const Offset(2, 3),
-                            ),
-                          ],
-                        ),
-                        child: CrecimientoMensualChart(
-                          datos: _dashboardData!.crecimiento,
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-                      _buildSectionTitle('Productos más Rentables'),
-                      _buildRentablesPreview(
-                        context,
-                        _dashboardData!.productosRentables,
-                      ),
-
-                      const SizedBox(height: 24),
-                      _buildSectionTitle('Distribución de Inventario'),
-                      _dashboardData!.distribucionInventario.isEmpty
-                          ? _buildPlaceholder('🥧 Sin datos de inventario')
-                          : _buildDistribucionInventario(
-                            context,
-                            _dashboardData!.distribucionInventario,
-                          ),
-                    ],
-                  ),
+      child: Scaffold(
+        backgroundColor: const Color.fromARGB(0, 247, 241, 241),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: ClipRRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: AppBar(
+                title: const Text('Panel del Dueño'),
+                centerTitle: true,
+                backgroundColor: Colors.white.withOpacity(0.1),
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  onPressed: () => Navigator.pop(context),
                 ),
               ),
-
-      // 💬 Chatbot flotante
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'chatbot_dueno',
-        backgroundColor: const Color(0xFF6A1B9A),
-        tooltip: 'Abrir Chatbot',
-        elevation: 6,
-        child: const Icon(Icons.chat, color: Colors.white),
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.white,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            builder: (_) => const SizedBox(height: 600, child: ChatbotScreen()),
-          );
-        },
+          ),
+        ),
+
+        body:
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Error: $_error',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadDashboard,
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                )
+                : RefreshIndicator(
+                  onRefresh: _loadDashboard,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildWelcomePanel(isMobile),
+                        const SizedBox(height: 24),
+                        _buildTopBar(context),
+                        const SizedBox(height: 24),
+                        _buildSectionTitle('Crecimiento Mensual'),
+                        const SizedBox(height: 12),
+                        _buildChartSection(),
+                        const SizedBox(height: 24),
+                        _buildSectionTitle('Productos más Rentables'),
+                        _buildRentablesPreview(
+                          context,
+                          _dashboardData!.productosRentables,
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSectionTitle('Distribución de Inventario'),
+                        _dashboardData!.distribucionInventario.isEmpty
+                            ? _buildPlaceholder('🥧 Sin datos de inventario')
+                            : _buildDistribucionInventario(
+                              context,
+                              _dashboardData!.distribucionInventario,
+                            ),
+                      ],
+                    ),
+                  ),
+                ),
+
+        floatingActionButton: FloatingActionButton(
+          heroTag: 'chatbot_dueno',
+          backgroundColor: const Color(0xFF00B0FF),
+          child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.white,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder:
+                  (_) => const SizedBox(height: 600, child: ChatbotScreen()),
+            );
+          },
+        ),
       ),
     );
   }
 
-  // 🌟 PANEL DE BIENVENIDA
-  Widget _buildWelcomePanel(BuildContext context, bool isMobile) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(isMobile ? 16 : 24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFFD1C4E9), Color(0xFFB39DDB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.purple.shade100.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(3, 5),
+  Widget _buildWelcomePanel(bool isMobile) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(isMobile ? 18 : 28),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
           ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: isMobile ? -10 : 20,
-            bottom: isMobile ? -10 : 10,
-            child: Opacity(
-              opacity: 0.1,
-              child: Icon(
-                Icons.analytics_outlined,
-                size: isMobile ? 100 : 160,
-                color: Colors.deepPurple.shade900,
-              ),
-            ),
-          ),
-          Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Bienvenido, Dueño 👑',
                 style: TextStyle(
-                  fontSize: isMobile ? 20 : 26,
+                  fontSize: isMobile ? 22 : 26,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF4A148C),
+                  color: Colors.lightBlueAccent.shade100,
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
+              const SizedBox(height: 8),
+              const Text(
                 'Visualiza ingresos, rentabilidad y desempeño general del negocio.',
-                style: TextStyle(
-                  fontSize: isMobile ? 14 : 16,
-                  color: Colors.deepPurple.shade700,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 16),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _topButton(context, Icons.receipt_long_outlined, 'Ventas', () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VentasScreen()),
+            ).then((_) => _loadDashboard());
+          }),
+          _topButton(context, Icons.account_balance_wallet_outlined, 'IVA', () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IvaRecaudadoScreen()),
+            ).then((_) => _loadDashboard());
+          }),
+          _topButton(context, Icons.trending_up_rounded, 'Promedio', () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PromedioVentaScreen()),
+            ).then((_) => _loadDashboard());
+          }),
+          _topButton(context, Icons.warning_amber_rounded, 'Alertas', () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AlertsScreen()),
+            ).then((_) => _loadDashboard());
+          }),
         ],
       ),
     );
   }
 
-  // 🔹 Botón del menú horizontal
-  Widget _buildTopButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _topButton(
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Colors.white.withOpacity(0.1),
           borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.purple.shade100.withOpacity(0.3),
-              blurRadius: 6,
-              offset: const Offset(2, 3),
-            ),
-          ],
+          border: Border.all(color: Colors.white24),
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF4A148C), size: 22),
-            const SizedBox(width: 8),
+            Icon(icon, color: Colors.lightBlueAccent.shade100, size: 22),
+            const SizedBox(width: 6),
             Text(
               label,
               style: const TextStyle(
+                color: Colors.white70,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF4A148C),
-                fontSize: 15,
               ),
             ),
           ],
@@ -340,116 +265,75 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
     );
   }
 
-  // 🔹 Título de secciones
-  Widget _buildSectionTitle(String text) {
+  Widget _buildSectionTitle(String title) {
     return Text(
-      text,
+      title,
       style: const TextStyle(
-        fontSize: 18,
+        color: Colors.white,
         fontWeight: FontWeight.bold,
-        color: Color(0xFF4A148C),
+        fontSize: 18,
       ),
     );
   }
 
-  // 🔸 Placeholder temporal para gráficas
+  Widget _buildChartSection() {
+    return Container(
+      height: 340,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: CrecimientoMensualChart(datos: _dashboardData!.crecimiento),
+    );
+  }
+
   Widget _buildPlaceholder(String text) {
     return Container(
-      margin: const EdgeInsets.only(top: 12),
-      height: 160,
-      width: double.infinity,
+      height: 140,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.purple.shade100.withOpacity(0.3),
-            blurRadius: 6,
-            offset: const Offset(2, 3),
-          ),
-        ],
+        border: Border.all(color: Colors.white12),
       ),
-      child: Center(
-        child: Text(
-          text,
-          style: const TextStyle(color: Colors.black54, fontSize: 14),
-          textAlign: TextAlign.center,
-        ),
-      ),
+      child: Text(text, style: const TextStyle(color: Colors.white60)),
     );
   }
 
   Widget _buildRentablesPreview(BuildContext context, List productos) {
-    if (productos.isEmpty) {
-      return Container(
-        margin: const EdgeInsets.only(top: 12),
-        height: 160,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.purple.shade100.withOpacity(0.3),
-              blurRadius: 6,
-              offset: const Offset(2, 3),
-            ),
-          ],
-        ),
-        child: const Center(
-          child: Text(
-            '🏆 0 productos analizados',
-            style: TextStyle(color: Colors.black54),
-          ),
-        ),
-      );
-    }
+    if (productos.isEmpty)
+      return _buildPlaceholder('🏆 Sin productos rentables');
 
     final top = productos.take(3).toList();
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.pushNamed(context, '/dueno/productos_rentables');
-      },
-      child: Container(
-        margin: const EdgeInsets.only(top: 12),
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.purple.shade100.withOpacity(0.3),
-              blurRadius: 6,
-              offset: const Offset(2, 3),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            for (final p in top)
-              ListTile(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children:
+            top.map((p) {
+              return ListTile(
                 leading: const Icon(
                   Icons.emoji_events,
-                  color: Color(0xFF6A1B9A),
+                  color: Colors.lightBlueAccent,
                 ),
                 title: Text(
                   p.nombre ?? 'Sin nombre',
                   style: const TextStyle(
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF4A148C),
                   ),
                 ),
                 trailing: Text(
                   '+\$${p.ganancia.toStringAsFixed(2)}',
-                  style: const TextStyle(color: Colors.green),
+                  style: const TextStyle(color: Colors.greenAccent),
                 ),
-              ),
-
-            // const Divider(),
-          ],
-        ),
+              );
+            }).toList(),
       ),
     );
   }
@@ -465,94 +349,145 @@ class _DuenoDashboardState extends State<DuenoDashboard> {
 
     return Container(
       margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.white,
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
         boxShadow: [
           BoxShadow(
-            color: Colors.purple.shade100.withOpacity(0.3),
-            blurRadius: 6,
-            offset: const Offset(2, 3),
+            color: Colors.blueAccent.withOpacity(0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // 🎯 Pie Chart
           SizedBox(
-            height: 320, // un poco más alto para respirar
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 3, // separación entre porciones
-                centerSpaceRadius: 60, // centro más pequeño
-                startDegreeOffset: -90, // empieza arriba (más simétrico)
-                sections:
-                    distribucionInventario.map((c) {
-                      final porcentaje = (c.valorInventario / totalValor) * 100;
+            height: 320,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    startDegreeOffset: -90,
+                    centerSpaceRadius: 70,
+                    sectionsSpace: 3,
+                    borderData: FlBorderData(show: false),
+                    sections:
+                        distribucionInventario.map((c) {
+                          final porcentaje =
+                              (c.valorInventario / totalValor) * 100;
+                          final mostrarTexto =
+                              porcentaje > 4; // evita saturación
 
-                      return PieChartSectionData(
-                        title:
-                            porcentaje < 8
-                                ? '' // 🔹 Oculta texto en porciones pequeñas
-                                : '${c.categoria}\n${porcentaje.toStringAsFixed(1)}%',
-                        value: c.valorInventario,
-                        color:
-                            Colors.accents[distribucionInventario.indexOf(c) %
-                                Colors.accents.length],
-                        radius: 100,
-                        titleStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          return PieChartSectionData(
+                            value: c.valorInventario,
+                            title:
+                                mostrarTexto
+                                    ? '${c.categoria}\n${porcentaje.toStringAsFixed(1)}%'
+                                    : '',
+                            radius: 110,
+                            color:
+                                Colors.primaries[distribucionInventario.indexOf(
+                                      c,
+                                    ) %
+                                    Colors.primaries.length],
+                            titleStyle: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                ),
+
+                // 💎 centro difuminado tipo glass
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
                         ),
-                      );
-                    }).toList(),
-              ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Total\n\$${totalValor.toStringAsFixed(0)}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
           const SizedBox(height: 16),
 
-          // 🔹 Leyenda personalizada
+          // 📊 Leyenda visual
           Wrap(
             alignment: WrapAlignment.center,
-            spacing: 12,
+            spacing: 10,
             runSpacing: 6,
             children:
                 distribucionInventario.map((c) {
                   final color =
-                      Colors.accents[distribucionInventario.indexOf(c) %
-                          Colors.accents.length];
+                      Colors.primaries[distribucionInventario.indexOf(c) %
+                          Colors.primaries.length];
                   final porcentaje = (c.valorInventario / totalValor * 100)
                       .toStringAsFixed(1);
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(3),
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        '${c.categoria} ($porcentaje%)',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ],
+                        const SizedBox(width: 5),
+                        Text(
+                          '${c.categoria} ($porcentaje%)',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }).toList(),
           ),
 
           const SizedBox(height: 16),
-
           Text(
-            '🥐 ${distribucionInventario.length} categorías analizadas\n💰 Valor total: \$${totalValor.toStringAsFixed(2)}',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 15, color: Colors.black54),
+            '💰 Valor total del inventario: \$${totalValor.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
