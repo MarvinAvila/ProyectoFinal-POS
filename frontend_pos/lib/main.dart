@@ -23,7 +23,6 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        // 🔹 Carrito global disponible en toda la app
         ChangeNotifierProvider(create: (_) => CartController()),
       ],
       child: const MyApp(),
@@ -37,32 +36,24 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'POS Roles App',
+      title: 'KioskoGo',
       debugShowCheckedModeBanner: false,
 
-      // ✅ Pantalla inicial ahora es la selección de rol
-      initialRoute: '/',
+      // ✅ IR DIRECTAMENTE AL HOME LOGIN
+      // El splash nativo se muestra automáticamente al inicio
+      home: const HomeLoginScreen(),
 
       routes: {
-        '/': (context) => const HomeLoginScreen(),
-
-        // ✅ Logins por rol (ACTUALIZADOS Y COMPLETOS)
         '/login/admin': (context) => const LoginScreen(role: 'admin'),
         '/login/gerente': (context) => const LoginScreen(role: 'gerente'),
-        '/login/dueno': (context) => const LoginScreen(role: 'dueno'), // ✅ AÑADIDO
-        '/login/cajero': (context) => const LoginScreen(role: 'cajero'), // ✅ CORREGIDO
-
-        // ✅ Dashboards
+        '/login/dueno': (context) => const LoginScreen(role: 'dueno'),
+        '/login/cajero': (context) => const LoginScreen(role: 'cajero'),
         '/admin/dashboard': (context) => const AdminDashboardScreen(),
         '/gerente/dashboard': (context) => const GerenteDashboard(),
         '/dueno/dashboard': (context) => const DuenoDashboard(),
         '/cajero/dashboard': (context) => const EmpleadoDashboardScreen(),
-
-        // ✅ Módulo de productos (CRUD)
         '/admin/productos': (context) => const ProductsScreen(),
         '/admin/productos/form': (context) => const ProductFormScreen(),
-
-        // ✅ Ventas (si la usas en empleado)
         '/cajero/ventas': (context) => const VentasScreen(),
       },
     );

@@ -1,11 +1,11 @@
 name: frontend_pos
-description: "A new Flutter project."
+description: "KioskoGo - Aplicación de punto de venta"
 publish_to: "none"
 
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.7.2 <4.0.0" # Cambiado para mejor compatibilidad
+  sdk: ">=3.7.2 <4.0.0"
 
 dependencies:
   flutter:
@@ -13,10 +13,8 @@ dependencies:
 
   # Dependencias principales
   shared_preferences: ^2.2.2
-  camera: ^0.10.5+1 # Versión compatible
+  camera: ^0.10.5+1
   google_mlkit_barcode_scanning: ^0.14.1
-
-  # El resto de tus dependencias
   google_fonts: ^6.0.0
   mobile_scanner: ^7.1.2
   path_provider: ^2.1.1
@@ -34,6 +32,26 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.0
+  flutter_native_splash: ^2.3.1
+  animated_splash_screen: ^1.3.0
 
+# ✅ SECCIÓN FLUTTER
 flutter:
   uses-material-design: true
+  assets:
+    - assets/iconos/
+
+# ✅ CONFIGURACIÓN ICONOS - USANDO logo1.png
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/iconos/logo1.png"
+  min_sdk_android: 21
+
+# ✅ CONFIGURACIÓN SPLASH SCREEN - USANDO Splash.png
+flutter_native_splash:
+  background_image: "assets/Splash.png"
+  android: true
+  ios: true
+
