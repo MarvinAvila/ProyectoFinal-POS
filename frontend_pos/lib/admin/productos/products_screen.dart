@@ -6,6 +6,7 @@ import 'product_model.dart';
 import '../../empleado/carrito/cart_controller.dart';
 import 'package:frontend_pos/core/widgets.dart';
 import 'add_product_screen.dart';
+import 'dart:ui';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -83,125 +84,172 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final currency = NumberFormat.currency(locale: 'es_MX', symbol: '\$');
     final isMobile = MediaQuery.of(context).size.width < 800;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F5FF), // fondo pastel suave
-      appBar: AppBar(
-        title: const Text('Productos'),
-        backgroundColor: const Color(0xFF6A1B9A), // morado POS admin
-        elevation: 0,
-        centerTitle: true,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment.topRight,
+          radius: 1.3,
+          colors: [
+            Color(0xFF0A0E21), // azul profundo
+            Color(0xFF1A237E), // azul neón oscuro
+          ],
+        ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              controller: _search,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: 'Buscar por nombre o código...',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF6A1B9A)),
-                suffixIcon:
-                    _search.text.isEmpty
-                        ? null
-                        : IconButton(
-                          tooltip: 'Limpiar',
-                          onPressed: () {
-                            _search.clear();
-                            _onSearch(null);
-                            setState(() {});
-                          },
-                          icon: const Icon(
-                            Icons.clear,
-                            color: Color(0xFF6A1B9A),
-                          ),
-                        ),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 0,
-                  horizontal: 12,
-                ),
-                border: OutlineInputBorder(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: ClipRRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: AppBar(
+                title: const Text('Productos'),
+                centerTitle: true,
+                elevation: 0,
+                backgroundColor: Colors.white.withOpacity(0.08),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ),
+        body: Column(
+          children: [
+            // 🔍 Barra de búsqueda con estilo glass
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(
-                    color: Color(0xFFB39DDB),
-                    width: 1.2,
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blueAccent.withOpacity(0.2),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _search,
+                  textInputAction: TextInputAction.search,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por nombre o código...',
+                    hintStyle: const TextStyle(color: Colors.white70),
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: Colors.cyanAccent,
+                    ),
+                    suffixIcon:
+                        _search.text.isEmpty
+                            ? null
+                            : IconButton(
+                              tooltip: 'Limpiar',
+                              onPressed: () {
+                                _search.clear();
+                                _onSearch(null);
+                                setState(() {});
+                              },
+                              icon: const Icon(
+                                Icons.clear,
+                                color: Colors.cyanAccent,
+                              ),
+                            ),
+                    filled: true,
+                    fillColor: Colors.transparent,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 0,
+                      horizontal: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: _onSearch,
                 ),
               ),
-              onChanged: (_) => setState(() {}),
-              onSubmitted: _onSearch,
             ),
-          ),
 
-          // 📱 Responsive Layout
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refresh,
-              child:
-                  _loading && _items.isEmpty
-                      ? const AppLoader(text: 'Cargando productos...')
-                      : _items.isEmpty
-                      ? const EmptyView(message: 'No hay productos')
-                      : LayoutBuilder(
-                        builder: (context, constraints) {
-                          // 📱 móvil -> lista | 🖥️ escritorio -> grid
-                          final crossAxisCount =
-                              constraints.maxWidth > 1000
-                                  ? 4
-                                  : constraints.maxWidth > 700
-                                  ? 2
-                                  : 1;
-                          return GridView.builder(
-                            controller: _scroll,
-                            padding: const EdgeInsets.all(12),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: crossAxisCount,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                  childAspectRatio:
-                                      isMobile ? 1.2 : 1.4, // adaptable
-                                ),
-                            itemCount: _items.length + (_end ? 0 : 1),
-                            itemBuilder: (context, index) {
-                              if (index >= _items.length) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
+            // 📦 Lista o grid
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _refresh,
+                color: Colors.cyanAccent,
+                child:
+                    _loading && _items.isEmpty
+                        ? const AppLoader(text: 'Cargando productos...')
+                        : _items.isEmpty
+                        ? const EmptyView(message: 'No hay productos')
+                        : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final crossAxisCount =
+                                constraints.maxWidth > 1000
+                                    ? 4
+                                    : constraints.maxWidth > 700
+                                    ? 2
+                                    : 1;
+                            return GridView.builder(
+                              controller: _scroll,
+                              padding: const EdgeInsets.all(12),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: crossAxisCount,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: isMobile ? 1.2 : 1.4,
+                                  ),
+                              itemCount: _items.length + (_end ? 0 : 1),
+                              itemBuilder: (context, index) {
+                                if (index >= _items.length) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.cyanAccent,
+                                    ),
+                                  );
+                                }
+                                final p = _items[index];
+                                return _ProductCard(
+                                  product: p,
+                                  currency: currency,
+                                  onTap: () => _showDetails(p, currency),
                                 );
-                              }
-                              final p = _items[index];
-                              return _ProductCard(
-                                product: p,
-                                currency: currency,
-                                onTap: () => _showDetails(p, currency),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                              },
+                            );
+                          },
+                        ),
+              ),
+            ),
+          ],
+        ),
+
+        // 🧊 FAB translúcido
+        floatingActionButton: ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: FloatingActionButton.extended(
+              backgroundColor: Colors.white.withOpacity(0.08),
+              icon: const Icon(Icons.add, color: Colors.cyanAccent),
+              label: const Text(
+                "Agregar producto",
+                style: TextStyle(
+                  color: Colors.cyanAccent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddProductScreen()),
+                );
+                if (result == true) _refresh();
+              },
             ),
           ),
-        ],
-      ),
-
-      // 👇 FAB: Agregar producto
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF6A1B9A),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          "Agregar producto",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddProductScreen()),
-          );
-          // 🔁 Si se guardó correctamente, recarga la lista
-          if (result == true) _refresh();
-        },
       ),
     );
   }
