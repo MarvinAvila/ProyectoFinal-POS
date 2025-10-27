@@ -7,13 +7,11 @@ import 'package:frontend_pos/core/http.dart';
 
 class ChatbotScreen extends StatelessWidget {
   const ChatbotScreen({Key? key}) : super(key: key);
-  
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) => ChatProvider(
-        ChatbotRepository(ApiClient()),
-      ),
+      create: (context) => ChatProvider(ChatbotRepository(ApiClient())),
       child: const ChatbotWidget(),
     );
   }
