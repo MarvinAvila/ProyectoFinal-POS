@@ -319,7 +319,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: _unidad,
+              value: _unidad,
               decoration: const InputDecoration(
                 labelText: 'Unidad de medida',
                 prefixIcon: Icon(Icons.scale_outlined),

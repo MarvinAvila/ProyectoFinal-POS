@@ -555,7 +555,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: DropdownButtonFormField<String>(
-                  initialValue: _unidadSeleccionada,
+                  value: _unidadSeleccionada,
                   decoration: InputDecoration(
                     labelText: 'Unidad',
                     border: OutlineInputBorder(
@@ -581,7 +581,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<int>(
-                        initialValue: _idCategoriaSeleccionada,
+                        value: _idCategoriaSeleccionada,
                         isExpanded: true,
                         decoration: InputDecoration(
                           labelText: 'Categoría',
