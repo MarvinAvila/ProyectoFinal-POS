@@ -66,7 +66,7 @@ router.patch('/:id',
     authMiddleware.requireRole(['admin', 'dueno']),
     categoriaValidations.patch || [], // ← Si no existe, usar array vacío temporalmente
     categoriaValidations.handleValidationErrors,
-    categoriaController.patch
+    categoriaController.update
 );
 
 // DELETE /categorias/:id - Eliminar categoría
