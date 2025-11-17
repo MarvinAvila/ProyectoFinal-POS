@@ -1,3 +1,6 @@
+const db = require("../config/database");
+const logger = require("../utils/logger");
+
 class Producto {
   constructor(
     id_producto,
@@ -96,6 +99,45 @@ class Producto {
   // ✅ NUEVO: Definir unidades como una constante estática
   static UNIDADES_PERMITIDAS = ["pieza", "kg", "lt", "unidad", "otro"];
 
+  // --- AGREGA ESTA NUEVA FUNCIÓN ESTÁTICA AQUÍ ---
+  /**
+   * Busca un producto por nombre (búsqueda flexible) o código de barras.
+   * @param {string} name - El nombre (parcial o completo) o código de barras.
+   * @returns {Promise<object|null>} El primer producto que coincida o null.
+   */
+  static async findByName(name) {
+    if (!name || name.trim() === "") {
+      return null;
+    }
+
+    // Usamos ILIKE y % para que 'galletas' encuentre 'Galletas Surtidas'
+    // Esta lógica es la misma que usa tu productoController.getAll
+    const searchTerm = `%${name}%`;
+
+    const query = `
+      SELECT id_producto, nombre, precio_venta, stock 
+      FROM productos 
+      WHERE 
+        activo = TRUE AND
+        (
+          nombre ILIKE $1 OR 
+          codigo_barra = $2
+        )
+      ORDER BY 
+        length(nombre) ASC   -- Prefiere nombres más cortos si hay múltiples
+      LIMIT 1
+    `;
+
+    try {
+      // Pasamos el término con % y el nombre original (por si es un código de barras)
+      const { rows } = await db.query(query, [searchTerm, name.trim()]);
+      return rows[0]; // Devuelve el primer resultado o undefined
+    } catch (error) {
+      logger.error(`Error en Producto.findByName: ${error.message}`);
+      throw error; // El controlador lo atrapará
+    }
+  }
+
   // Métodos estáticos
   static fromDatabaseRow(row) {
     // ✅ CORRECCIÓN: Manejo seguro de codigos_public_ids
@@ -159,9 +201,14 @@ class Producto {
       errors.push("El stock no puede ser negativo");
     }
 
-    if (productoData.unidad && !Producto.UNIDADES_PERMITIDAS.includes(productoData.unidad)) {
+    if (
+      productoData.unidad &&
+      !Producto.UNIDADES_PERMITIDAS.includes(productoData.unidad)
+    ) {
       errors.push(
-        `Unidad no válida. Permitidas: ${Producto.UNIDADES_PERMITIDAS.join(", ")}`
+        `Unidad no válida. Permitidas: ${Producto.UNIDADES_PERMITIDAS.join(
+          ", "
+        )}`
       );
     }
 

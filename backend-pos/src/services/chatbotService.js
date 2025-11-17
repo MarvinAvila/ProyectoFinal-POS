@@ -1,6 +1,12 @@
+// backend-pos/src/services/chatbotService.js
+
 class ChatbotService {
   constructor() {
     this.knowledgeBase = this.initializeKnowledgeBase();
+    
+    // --- NUEVO: Palabras clave para intenciones dinámicas ---
+    this.pricePatterns = ["precio de", "cuanto cuesta", "costo de", "precio"];
+    this.stockPatterns = ["stock de", "cuantos hay", "inventario de", "stock"];
   }
 
   normalizeText(text) {
@@ -8,10 +14,31 @@ class ChatbotService {
       .toLowerCase()
       .normalize("NFD") // Separar tildes
       .replace(/[\u0300-\u036f]/g, "") // Eliminar tildes
+      .replace(/[¿?¡!]/g, "") // --- NUEVO: Eliminar signos de puntuación ---
       .trim();
   }
 
+  /**
+   * --- NUEVO: Extrae el nombre del producto de un mensaje ---
+   * Quita las palabras clave para dejar solo el nombre.
+   * Ej: "cuanto cuesta galletas surtidas" -> "galletas surtidas"
+   */
+  extractProductName(message, patternsToExclude) {
+    let productName = message;
+    // Iteramos de la más larga a la más corta para evitar reemplazar "stock" antes que "stock de"
+    const sortedPatterns = patternsToExclude.sort((a, b) => b.length - a.length);
+
+    for (const pattern of sortedPatterns) {
+      const regex = new RegExp(this.normalizeText(pattern), 'gi');
+      productName = productName.replace(regex, '');
+    }
+    return productName.trim();
+  }
+
   initializeKnowledgeBase() {
+    // [PEGA AQUÍ TU KNOWLEDGE BASE COMPLETA (200+ LÍNEAS)]
+    // Desde `return {` hasta `};`
+    // (Pego tu base de conocimiento que me diste en el prompt anterior)
     return {
       // ==================== SALUDOS Y AYUDA GENERAL ====================
       saludo: {
@@ -377,24 +404,54 @@ Parece que tu pregunta está fuera del alcance de mi conocimiento actual.
     };
   }
 
-  getResponse(userMessage, userRole) {
-    const cleanMessage = this.normalizeText(userMessage); // ✅ USAR NORMALIZACIÓN
+  // --- MODIFICADO: getResponse ahora es async y devuelve un OBJETO ---
+  async getResponse(userMessage, userRole) {
+    const cleanMessage = this.normalizeText(userMessage);
 
     // Validar rol del usuario
     const rolesValidos = ["cajero", "admin", "gerente", "dueno"];
     if (!rolesValidos.includes(userRole)) {
-      return this.knowledgeBase.acceso_denegado.response;
+      return { 
+        intent: 'static_response', 
+        response: this.knowledgeBase.acceso_denegado.response 
+      };
     }
 
-    // Buscar coincidencia más específica primero
+    // --- 1. REVISAR INTENCIONES DINÁMICAS (PRECIO Y STOCK) ---
+    // (Asumimos que todos los roles pueden preguntar precio y stock)
+    
+    // Revisar si es una consulta de PRECIO
+    for (const pattern of this.pricePatterns) {
+      if (cleanMessage.includes(this.normalizeText(pattern))) {
+        const productName = this.extractProductName(cleanMessage, this.pricePatterns);
+        if (productName) {
+          // Devuelve un OBJETO DE INTENCIÓN, no un string
+          return { intent: 'get_price', entity: productName };
+        }
+      }
+    }
+
+    // Revisar si es una consulta de STOCK
+    for (const pattern of this.stockPatterns) {
+      if (cleanMessage.includes(this.normalizeText(pattern))) {
+        const productName = this.extractProductName(cleanMessage, this.stockPatterns);
+        if (productName) {
+          // Devuelve un OBJETO DE INTENCIÓN
+          return { intent: 'get_stock', entity: productName };
+        }
+      }
+    }
+
+    // --- 2. REVISAR PREGUNTAS FRECUENTES (Tu código actual) ---
     let bestMatch = null;
     let maxMatches = 0;
 
     for (const [category, data] of Object.entries(this.knowledgeBase)) {
       if (category === "fallback" || category === "acceso_denegado") continue;
 
+      // La lógica se invierte: el patrón debe estar en el mensaje
       const matchCount = data.patterns.filter(
-        (pattern) => cleanMessage.includes(this.normalizeText(pattern)) // ✅ NORMALIZAR PATRONES TAMBIÉN
+        (pattern) => cleanMessage.includes(this.normalizeText(pattern))
       ).length;
 
       if (matchCount > maxMatches) {
@@ -406,15 +463,16 @@ Parece que tu pregunta está fuera del alcance de mi conocimiento actual.
     // Verificar permisos si hay coincidencia
     if (bestMatch && maxMatches > 0) {
       const categoryData = this.knowledgeBase[bestMatch];
-
       if (categoryData.roles.includes(userRole)) {
-        return categoryData.response;
+        // Devuelve un OBJETO DE RESPUESTA
+        return { intent: 'static_response', response: categoryData.response };
       } else {
-        return this.knowledgeBase.acceso_denegado.response;
+        return { intent: 'static_response', response: this.knowledgeBase.acceso_denegado.response };
       }
     }
 
-    return this.knowledgeBase.fallback.response;
+    // --- 3. FALLBACK ---
+    return { intent: 'fallback', response: this.knowledgeBase.fallback.response };
   }
 }
 
