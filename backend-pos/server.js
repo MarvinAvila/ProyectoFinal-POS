@@ -1,39 +1,20 @@
+// server.js
+// Carga el .env para desarrollo/producción
 require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const morgan = require("morgan");
-const db = require("./src/config/database"); // Importar la configuración de BD
+
+// Importa la app definida en app.js
+const app = require("./app");
+const db = require("./src/config/database");
 const {
   inicializarBaseDeDatos,
   crearTriggers,
-} = require("./src/config/initDatabase"); // ✅ NUEVO: Importar inicialización
+} = require("./src/config/initDatabase");
 
-const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middlewares básicos
-app.use(cors());
-app.use(morgan("combined"));
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
-
-// Importar rutas
-const authRoutes = require("./src/routes/auth");
-const usuarioRoutes = require("./src/routes/usuarios");
-const productoRoutes = require("./src/routes/productos");
-const proveedorRoutes = require("./src/routes/proveedores");
-const ventaRoutes = require("./src/routes/ventas");
-const reporteRoutes = require("./src/routes/reportes");
-const categoriaRoutes = require("./src/routes/categorias");
-const alertaRoutes = require("./src/routes/alertas");
-const dashboardRoutes = require("./src/routes/dashboard");
-const inventarioRoutes = require("./src/routes/inventario");
-const ofertaRoutes = require("./src/routes/ofertas");
-const comprobanteRoutes = require("./src/routes/comprobantes");
-const detalleVentaRoutes = require("./src/routes/detalleVenta");
-const productoOfertaRoutes = require("./src/routes/productoOferta");
-const chatbotRoutes = require("./src/routes/chatbot");
-const barcodeRoutes = require("./src/routes/barcodes");
+// =================================================================
+// LÓGICA DE ARRANQUE (Se queda aquí)
+// =================================================================
 
 // Función para verificar la conexión a la base de datos
 async function verificarConexionBD() {
@@ -42,22 +23,20 @@ async function verificarConexionBD() {
       "SELECT current_database() as db_name, current_user as usuario, version() as postgres_version"
     );
     console.log("🔍 INFORMACIÓN DE CONEXIÓN A BD:");
-    console.log("   📊 Base de datos:", result.rows[0].db_name);
-    console.log("   👤 Usuario:", result.rows[0].usuario);
+    console.log("   📊 Base de datos:", result.rows[0].db_name);
+    console.log("   👤 Usuario:", result.rows[0].usuario);
     console.log(
-      "   🐘 PostgreSQL:",
+      "   🐘 PostgreSQL:",
       result.rows[0].postgres_version.split(",")[0]
     );
-
-    // Verificar si existen tablas (opcional)
     const tablasResult = await db.query(`
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            LIMIT 5
-        `);
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+  nbsp;         LIMIT 5
+        `);
     console.log(
-      "   📋 Tablas existentes (primeras 5):",
+      "   📋 Tablas existentes (primeras 5):",
       tablasResult.rows.map((t) => t.table_name).join(", ") || "Ninguna"
     );
   } catch (error) {
@@ -65,574 +44,7 @@ async function verificarConexionBD() {
   }
 }
 
-// Usar rutas
-app.use("/api/auth", authRoutes);
-app.use("/api/usuarios", usuarioRoutes);
-app.use("/api/productos", productoRoutes);
-app.use("/api/proveedores", proveedorRoutes);
-app.use("/api/ventas", ventaRoutes);
-app.use("/api/reportes", reporteRoutes);
-app.use("/api/categorias", categoriaRoutes);
-app.use("/api/alertas", alertaRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/inventario", inventarioRoutes);
-app.use("/api/ofertas", ofertaRoutes);
-app.use("/api/comprobantes", comprobanteRoutes);
-app.use("/api/detalle-venta", detalleVentaRoutes);
-app.use("/api/producto-oferta", productoOfertaRoutes);
-app.use("/api/chatbot", chatbotRoutes);
-app.use("/api/barcodes", barcodeRoutes);
-
-// Ruta de salud mejorada con info de BD
-app.get("/api/health", async (req, res) => {
-  try {
-    const dbResult = await db.query(
-      "SELECT current_database() as db_name, current_user as usuario"
-    );
-
-    res.json({
-      success: true,
-      message: "Servidor funcionando correctamente",
-      database: {
-        name: dbResult.rows[0].db_name,
-        user: dbResult.rows[0].usuario,
-        status: "connected",
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Error de conexión a la base de datos",
-      error: error.message,
-    });
-  }
-});
-
-// Ruta adicional para información detallada de BD
-app.get("/api/db-info", async (req, res) => {
-  try {
-    const [dbInfo, tablas, columnas] = await Promise.all([
-      db.query(
-        "SELECT current_database() as name, current_user as user, version() as version"
-      ),
-      db.query(`
-                SELECT table_name, table_type 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public'
-                ORDER BY table_name
-            `),
-      // ✅ NUEVO: Consulta para obtener la estructura de todas las columnas
-      db.query(`
-                SELECT 
-                    table_name, 
-                    column_name, 
-                    data_type, 
-                    is_nullable, 
-                    column_default,
-                    character_maximum_length,
-                    udt_name
-                FROM information_schema.columns 
-                WHERE table_schema = 'public' 
-                ORDER BY table_name, ordinal_position
-            `),
-    ]);
-
-    // ✅ NUEVO: Agrupar columnas por tabla
-    const columnasPorTabla = columnas.rows.reduce((acc, col) => {
-      if (!acc[col.table_name]) {
-        acc[col.table_name] = [];
-      }
-      acc[col.table_name].push({
-        name: col.column_name,
-        type: col.data_type,
-        is_nullable: col.is_nullable === "YES",
-        default: col.column_default,
-        max_length: col.character_maximum_length,
-      });
-      return acc;
-    }, {});
-
-    // ✅ NUEVO: Combinar tablas con su estructura
-    const tablasConEstructura = tablas.rows.map((tabla) => ({
-      ...tabla,
-      columns: columnasPorTabla[tabla.table_name] || [],
-    }));
-
-    res.json({
-      success: true,
-      database: dbInfo.rows[0],
-      tables: tablasConEstructura,
-      total_tables: tablasConEstructura.length,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-app.post("/api/init-db", async (req, res) => {
-  try {
-    console.log("🔄 Solicitada inicialización de BD...");
-    await inicializarBaseDeDatos();
-    await crearTriggers();
-
-    res.json({
-      success: true,
-      message: "Base de datos inicializada correctamente",
-    });
-  } catch (error) {
-    console.error("❌ Error en init-db:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-app.post("/api/init-db", async (req, res) => {
-  try {
-    console.log("🔄 Solicitada inicialización de BD...");
-    await inicializarBaseDeDatos();
-    await crearTriggers();
-
-    res.json({
-      success: true,
-      message: "Base de datos inicializada correctamente",
-    });
-  } catch (error) {
-    console.error("❌ Error en init-db:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// ✅ NUEVO: Endpoint para actualizar BD con campos de códigos QR/barras
-app.post("/api/admin/update-barcode-fields", async (req, res) => {
-  console.log("🔄 Solicitada actualización de BD para códigos QR/barras...");
-
-  const db = require("./src/config/database");
-  const client = await db.getClient();
-
-  try {
-    await client.query("BEGIN");
-
-    console.log("\n📋 EJECUTANDO ACTUALIZACIONES:");
-
-    // 1. Agregar nuevos campos a productos
-    console.log("1. ➕ Agregando nuevos campos a tabla productos...");
-    await client.query(`
-            ALTER TABLE productos 
-            ADD COLUMN IF NOT EXISTS codigo_barras_url VARCHAR(500),
-            ADD COLUMN IF NOT EXISTS codigo_qr_url VARCHAR(500),
-            ADD COLUMN IF NOT EXISTS codigos_public_ids JSONB,
-            ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE,
-            ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMP DEFAULT NOW(),
-            ADD COLUMN IF NOT EXISTS fecha_actualizacion TIMESTAMP DEFAULT NOW()
-        `);
-
-    // 2. Actualizar productos existentes
-    console.log("2. 🔄 Actualizando productos existentes...");
-    const updateResult = await client.query(`
-            UPDATE productos 
-            SET activo = COALESCE(activo, TRUE),
-                fecha_creacion = COALESCE(fecha_creacion, NOW()),
-                fecha_actualizacion = NOW()
-            WHERE activo IS NULL OR fecha_creacion IS NULL
-        `);
-    console.log(`   ✅ ${updateResult.rowCount} productos actualizados`);
-
-    // 3. Crear índices para mejor rendimiento
-    console.log("3. 🗂️ Creando índices...");
-    await client.query(`
-            CREATE INDEX IF NOT EXISTS idx_productos_activo ON productos(activo);
-            CREATE INDEX IF NOT EXISTS idx_productos_codigo_barra ON productos(codigo_barra);
-            CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos(id_categoria);
-            CREATE INDEX IF NOT EXISTS idx_productos_stock ON productos(stock);
-        `);
-
-    // 4. Actualizar trigger de fecha_actualizacion
-    console.log("4. ⚡ Actualizando trigger...");
-    await client.query(`
-            CREATE OR REPLACE FUNCTION set_fecha_actualizacion()
-            RETURNS TRIGGER AS $$
-            BEGIN
-                NEW.fecha_actualizacion := NOW();
-                RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-
-            DROP TRIGGER IF EXISTS trg_set_fecha_actualizacion ON productos;
-            
-            CREATE TRIGGER trg_set_fecha_actualizacion
-            BEFORE UPDATE ON productos
-            FOR EACH ROW
-            EXECUTE FUNCTION set_fecha_actualizacion();
-        `);
-
-    // 5. Verificar cambios
-    console.log("5. ✅ Verificando cambios...");
-    const verification = await client.query(`
-            SELECT 
-                column_name,
-                data_type,
-                is_nullable
-            FROM information_schema.columns 
-            WHERE table_name = 'productos' 
-            AND column_name IN ('codigo_barras_url', 'codigo_qr_url', 'codigos_public_ids', 'activo')
-            ORDER BY column_name
-        `);
-
-    await client.query("COMMIT");
-
-    console.log("\n🎉 ACTUALIZACIÓN COMPLETADA EXITOSAMENTE!");
-
-    // Verificar conteo de productos actualizados
-    const countResult = await client.query(
-      "SELECT COUNT(*) as total FROM productos WHERE activo = TRUE"
-    );
-
-    res.json({
-      success: true,
-      message: "Base de datos actualizada para códigos QR y barras",
-      detalles: {
-        campos_agregados: verification.rows.map((row) => ({
-          nombre: row.column_name,
-          tipo: row.data_type,
-          nullable: row.is_nullable === "YES",
-        })),
-        productos_activos: parseInt(countResult.rows[0].total),
-        estado: "LISTO",
-      },
-    });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("\n❌ ERROR durante la actualización:", error.message);
-
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      codigo: error.code,
-      mensaje:
-        "Error actualizando BD, pero algunos campos pueden haberse agregado",
-    });
-  } finally {
-    client.release();
-  }
-});
-
-// ✅ NUEVO: Endpoint para actualizar tabla de alertas
-app.post("/api/admin/update-alertas-table", async (req, res) => {
-  console.log("🔄 Solicitada actualización de tabla alertas...");
-
-  const db = require("./src/config/database");
-  const client = await db.getClient();
-
-  try {
-    await client.query("BEGIN");
-
-    console.log("\n📋 EJECUTANDO ACTUALIZACIONES EN TABLA ALERTAS:");
-
-    // 1. Agregar columna fecha_atendida si no existe
-    console.log("1. ➕ Agregando columna fecha_atendida...");
-    await client.query(`
-      ALTER TABLE alertas 
-      ADD COLUMN IF NOT EXISTS fecha_atendida TIMESTAMP DEFAULT NULL
-    `);
-
-    // 2. Actualizar alertas existentes que están atendidas pero sin fecha
-    console.log("2. 🔄 Actualizando alertas atendidas existentes...");
-    const updateResult = await client.query(`
-      UPDATE alertas 
-      SET fecha_atendida = NOW() 
-      WHERE atendida = TRUE AND fecha_atendida IS NULL
-    `);
-    console.log(`   ✅ ${updateResult.rowCount} alertas actualizadas`);
-
-    // 3. Crear índice para mejor rendimiento
-    console.log("3. 🗂️ Creando índices para alertas...");
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_alertas_atendida ON alertas(atendida);
-      CREATE INDEX IF NOT EXISTS idx_alertas_fecha ON alertas(fecha);
-      CREATE INDEX IF NOT EXISTS idx_alertas_tipo ON alertas(tipo);
-      CREATE INDEX IF NOT EXISTS idx_alertas_producto ON alertas(id_producto);
-    `);
-
-    // 4. Verificar cambios
-    console.log("4. ✅ Verificando cambios...");
-    const verification = await client.query(`
-      SELECT 
-        column_name,
-        data_type,
-        is_nullable,
-        column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'alertas' 
-      AND column_name = 'fecha_atendida'
-    `);
-
-    // 5. Contar alertas por estado
-    const statsResult = await client.query(`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE atendida = TRUE) as atendidas,
-        COUNT(*) FILTER (WHERE atendida = FALSE) as pendientes
-      FROM alertas
-    `);
-
-    await client.query("COMMIT");
-
-    console.log("\n🎉 ACTUALIZACIÓN DE ALERTAS COMPLETADA EXITOSAMENTE!");
-
-    res.json({
-      success: true,
-      message: "Tabla de alertas actualizada correctamente",
-      detalles: {
-        columna_agregada:
-          verification.rows.length > 0
-            ? {
-                nombre: verification.rows[0].column_name,
-                tipo: verification.rows[0].data_type,
-                nullable: verification.rows[0].is_nullable === "YES",
-                default: verification.rows[0].column_default,
-              }
-            : null,
-        estadisticas: {
-          total_alertas: parseInt(statsResult.rows[0].total),
-          alertas_atendidas: parseInt(statsResult.rows[0].atendidas),
-          alertas_pendientes: parseInt(statsResult.rows[0].pendientes),
-        },
-        estado: "COMPLETADO",
-      },
-    });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("\n❌ ERROR durante la actualización:", error.message);
-
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      codigo: error.code,
-      mensaje: "Error actualizando tabla de alertas",
-    });
-  } finally {
-    client.release();
-  }
-});
-
-// ✅ NUEVO: Endpoint para migrar productos sin código de barras
-app.post("/api/admin/migrate-productos-sin-codigo", async (req, res) => {
-  console.log("🔄 Iniciando migración de productos sin código de barras...");
-
-  const db = require("./src/config/database");
-  const BarcodeGenerator = require("./src/utils/barcodeGenerator");
-  const BarcodeService = require("./src/services/barcodeService");
-  const QRService = require("./src/services/qrService");
-  const logger = require("./src/utils/logger");
-
-  const client = await db.getClient();
-
-  try {
-    await client.query("BEGIN");
-
-    // 1. Encontrar productos sin código de barras
-    console.log("1. 🔍 Buscando productos sin código de barras...");
-    const productosSinCodigo = await client.query(
-      `SELECT id_producto, nombre, precio_venta, stock, unidad, 
-              id_categoria, id_proveedor, fecha_creacion
-       FROM productos 
-       WHERE codigo_barra IS NULL OR codigo_barra = '' OR codigo_barra = '0'`
-    );
-
-    console.log(
-      `   📦 Encontrados ${productosSinCodigo.rows.length} productos sin código`
-    );
-
-    let productosMigrados = 0;
-    let productosConErrores = 0;
-
-    // 2. Procesar cada producto
-    for (const producto of productosSinCodigo.rows) {
-      try {
-        console.log(
-          `   🔄 Procesando: ${producto.nombre} (ID: ${producto.id_producto})`
-        );
-
-        // 🆕 GENERAR CÓDIGO DE BARRAS AUTOMÁTICO
-        const nuevoCodigo = await BarcodeGenerator.generateUniqueBarcode();
-        console.log(`      📊 Código generado: ${nuevoCodigo}`);
-
-        // 🆕 PREPARAR DATOS PARA GENERAR CÓDIGOS
-        const productoData = {
-          ...producto,
-          codigo_barra: nuevoCodigo,
-        };
-
-        let codigosGenerados = null;
-
-        try {
-          // 🆕 GENERAR CÓDIGO DE BARRAS
-          console.log(`      🖼️ Generando código de barras...`);
-          const barcodeResult = await BarcodeService.generateProductCodes(
-            productoData
-          );
-
-          // 🆕 GENERAR QR CON LOS DATOS COMPLETOS
-          console.log(`      📱 Generando QR...`);
-          const productoDataConBarcodeURL = {
-            ...productoData,
-            codigo_barras_url: barcodeResult.barcode_url,
-          };
-          const qrResult = await QRService.generateProductQR(
-            productoDataConBarcodeURL
-          );
-
-          codigosGenerados = {
-            barcode_url: barcodeResult.barcode_url,
-            qr_url: qrResult.qr_url,
-            codigos_public_ids: {
-              barcode: barcodeResult.barcode_public_id,
-              qr: qrResult.qr_public_id,
-            },
-          };
-
-          console.log(`      ✅ Códigos generados exitosamente`);
-        } catch (error) {
-          console.log(`      ⚠️ Error generando códigos: ${error.message}`);
-          // Continuar con la migración aunque falle la generación de códigos
-          codigosGenerados = null;
-        }
-
-        // 🆕 ACTUALIZAR PRODUCTO EN BD
-        await client.query(
-          `UPDATE productos SET 
-           codigo_barra = $1,
-           codigo_barras_url = $2,
-           codigo_qr_url = $3,
-           codigos_public_ids = $4,
-           fecha_actualizacion = CURRENT_TIMESTAMP
-           WHERE id_producto = $5`,
-          [
-            nuevoCodigo,
-            codigosGenerados?.barcode_url || null,
-            codigosGenerados?.qr_url || null,
-            codigosGenerados
-              ? JSON.stringify(codigosGenerados.codigos_public_ids)
-              : null,
-            producto.id_producto,
-          ]
-        );
-
-        productosMigrados++;
-        console.log(`      ✅ Producto migrado: ${producto.nombre}`);
-      } catch (error) {
-        productosConErrores++;
-        console.log(
-          `      ❌ Error migrando ${producto.nombre}: ${error.message}`
-        );
-        // Continuar con el siguiente producto
-      }
-    }
-
-    await client.query("COMMIT");
-
-    // 3. VERIFICAR RESULTADO FINAL
-    console.log("\n🎉 MIGRACIÓN COMPLETADA!");
-    console.log(`   ✅ Productos migrados: ${productosMigrados}`);
-    console.log(`   ❌ Productos con errores: ${productosConErrores}`);
-    console.log(`   📊 Total procesados: ${productosSinCodigo.rows.length}`);
-
-    res.json({
-      success: true,
-      message: "Migración de productos sin código completada",
-      resultados: {
-        productos_procesados: productosSinCodigo.rows.length,
-        productos_migrados: productosMigrados,
-        productos_con_errores: productosConErrores,
-        porcentaje_exito:
-          ((productosMigrados / productosSinCodigo.rows.length) * 100).toFixed(
-            2
-          ) + "%",
-      },
-    });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("\n❌ ERROR durante la migración:", error.message);
-
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      mensaje: "Error durante la migración de productos",
-    });
-  } finally {
-    client.release();
-  }
-});
-
-// ✅ NUEVO: Endpoint para verificar estado de migración
-app.get("/api/admin/estado-migracion", async (req, res) => {
-  const db = require("./src/config/database");
-  const client = await db.getClient();
-
-  try {
-    const resultado = await client.query(`
-      SELECT 
-        COUNT(*) as total_productos,
-        COUNT(*) FILTER (WHERE codigo_barra IS NULL OR codigo_barra = '' OR codigo_barra = '0') as sin_codigo,
-        COUNT(*) FILTER (WHERE codigo_barra IS NOT NULL AND codigo_barra != '' AND codigo_barra != '0') as con_codigo,
-        COUNT(*) FILTER (WHERE codigo_barras_url IS NOT NULL) as con_barcode_url,
-        COUNT(*) FILTER (WHERE codigo_qr_url IS NOT NULL) as con_qr_url
-      FROM productos
-      WHERE activo = TRUE
-    `);
-
-    const total = parseInt(resultado.rows[0].total_productos);
-    const conCodigo = parseInt(resultado.rows[0].con_codigo);
-
-    res.json({
-      success: true,
-      estado_migracion: {
-        total_productos: total,
-        productos_sin_codigo: parseInt(resultado.rows[0].sin_codigo),
-        productos_con_codigo: conCodigo,
-        productos_con_barcode: parseInt(resultado.rows[0].con_barcode_url),
-        productos_con_qr: parseInt(resultado.rows[0].con_qr_url),
-        porcentaje_completado:
-          total > 0 ? ((conCodigo / total) * 100).toFixed(2) + "%" : "0%",
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  } finally {
-    client.release();
-  }
-});
-
-// Manejo de errores 404
-app.use("*", (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Ruta no encontrada",
-  });
-});
-
-// Manejo global de errores
-app.use((error, req, res, next) => {
-  console.error("Error global:", error);
-  res.status(500).json({
-    success: false,
-    message: "Error interno del servidor",
-  });
-});
-
-// ✅ MODIFICADO: Iniciar servidor con inicialización automática de BD
+// Iniciar servidor con inicialización automática de BD
 app.listen(PORT, "0.0.0.0", async () => {
   console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
   console.log(
@@ -644,18 +56,15 @@ app.listen(PORT, "0.0.0.0", async () => {
   console.log(
     `🔄 Endpoint de inicialización: http://localhost:${PORT}/api/init-db`
   );
-  console.log("⏳ Verificando conexión a la base de datos...");
+  console.log("⏳ Verificando conexión a la base de datos..."); // Verificar conexión a BD
 
-  // Verificar conexión a BD
-  await verificarConexionBD();
+  await verificarConexionBD(); // Inicializar automáticamente las tablas al iniciar
 
-  // ✅ NUEVO: Inicializar automáticamente las tablas al iniciar
+  // ESTO NO SE EJECUTARÁ DURANTE LOS TESTS
   console.log("🔄 Inicializando tablas de la base de datos...");
   try {
     await inicializarBaseDeDatos();
     console.log("✅ Tablas inicializadas correctamente");
-
-    // Intentar crear triggers (opcional)
     await crearTriggers();
   } catch (error) {
     console.error("❌ Error inicializando tablas:", error.message);
@@ -663,4 +72,4 @@ app.listen(PORT, "0.0.0.0", async () => {
   }
 });
 
-module.exports = app;
+// NO SE EXPORTA NADA DESDE AQUÍ
