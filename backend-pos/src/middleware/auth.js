@@ -220,7 +220,8 @@ const authMiddleware = {
                         productos: ['read', 'write', 'delete'],
                         ventas: ['read', 'write', 'delete'],
                         reportes: ['read', 'write', 'delete'],
-                        configuracion: ['read', 'write', 'delete']
+                        configuracion: ['read', 'write', 'delete'],
+                        categorias: ['read', 'write', 'delete']
                     },
                     admin: {
                         usuarios: ['read', 'write'],

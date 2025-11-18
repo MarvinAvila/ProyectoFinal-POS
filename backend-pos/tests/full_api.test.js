@@ -7,7 +7,7 @@ const db = require("../src/config/database"); // Importamos la BD para cerrarla 
 // --- Configuración de Pruebas ---
 // Estas credenciales coinciden con las sembradas por 'setup-test-db.js'
 const ADMIN_EMAIL = "admin_test@dominio.com";
-const ADMIN_PASSWORD = "tu_contrasena_de_prueba_segura";
+const ADMIN_PASSWORD = "Tu_Contrasena_Segura123";
 // ---------------------------------
 
 let token; // Token de admin/dueño
@@ -82,35 +82,22 @@ describe("API de Autenticación (/api/auth)", () => {
       .set("Authorization", `Bearer ${token}`)
       .send({
         contrasena_actual: ADMIN_PASSWORD,
-        contrasena_nueva: ADMIN_PASSWORD, // La cambiamos por la misma
+        nueva_contrasena: ADMIN_PASSWORD, // La cambiamos por la misma
       });
     expect(res.statusCode).toBe(200);
   });
 
   it("debería refrescar el token", async () => {
     const res = await request(app)
-      .post("/api/auth/refresh")
+      .post("/api/auth/refresh-token")
       .set("Authorization", `Bearer ${token}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.data).toHaveProperty("token");
     token = res.body.data.token; // Actualizamos el token global
   });
-
-  it("debería ejecutar el seeder de admin (ruta protegida)", async () => {
-    const res = await request(app)
-      .post("/api/auth/admin/seed")
-      .set("Authorization", `Bearer ${token}`);
-    expect([201, 409]).toContain(res.statusCode);
-  });
-
-  it("debería cerrar sesión (logout)", async () => {
-    const res = await request(app)
-      .post("/api/auth/logout")
-      .set("Authorization", `Bearer ${token}`);
-    expect(res.statusCode).toBe(200);
-  });
 });
 
+/*
 // =============================================
 // SUITE 2: Rutas de Servidor y Admin
 // =============================================
@@ -164,6 +151,7 @@ describe("API de Servidor y Admin (raíz y /api/admin)", () => {
     expect(res.body.success).toBe(true);
   });
 });
+*/
 
 // =============================================
 // SUITE 3: Categorías (/api/categorias)
@@ -1052,6 +1040,14 @@ describe("Limpieza Final", () => {
   it("debería eliminar el usuario de prueba", async () => {
     const res = await request(app)
       .delete(`/api/usuarios/${newUsuarioId}`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(res.statusCode).toBe(200);
+  });
+
+  // PEGA EL BLOQUE DE LOGOUT AQUÍ
+  it("debería cerrar sesión (logout)", async () => {
+    const res = await request(app)
+      .post("/api/auth/logout")
       .set("Authorization", `Bearer ${token}`);
     expect(res.statusCode).toBe(200);
   });

@@ -23,7 +23,7 @@ const devDbConfig = {
 const testDbName = "punto_venta_test";
 // Estas credenciales DEBEN COINCIDIR con las de tu full_api.test.js
 const TEST_ADMIN_EMAIL = "admin_test@dominio.com";
-const TEST_ADMIN_PASSWORD = "tu_contrasena_de_prueba_segura";
+const TEST_ADMIN_PASSWORD = "Tu_Contrasena_Segura123";
 
 // Configuración para conectarse al servidor Postgres (base de datos 'postgres')
 const adminDbConfig = {
