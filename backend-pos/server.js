@@ -23,20 +23,20 @@ async function verificarConexionBD() {
       "SELECT current_database() as db_name, current_user as usuario, version() as postgres_version"
     );
     console.log("🔍 INFORMACIÓN DE CONEXIÓN A BD:");
-    console.log("   📊 Base de datos:", result.rows[0].db_name);
-    console.log("   👤 Usuario:", result.rows[0].usuario);
+    console.log("   📊 Base de datos:", result.rows[0].db_name);
+    console.log("   👤 Usuario:", result.rows[0].usuario);
     console.log(
-      "   🐘 PostgreSQL:",
+      "   🐘 PostgreSQL:",
       result.rows[0].postgres_version.split(",")[0]
     );
     const tablasResult = await db.query(`
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-  nbsp;         LIMIT 5
-        `);
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            LIMIT 5
+        `);
     console.log(
-      "   📋 Tablas existentes (primeras 5):",
+      "   📋 Tablas existentes (primeras 5):",
       tablasResult.rows.map((t) => t.table_name).join(", ") || "Ninguna"
     );
   } catch (error) {
@@ -61,11 +61,13 @@ app.listen(PORT, "0.0.0.0", async () => {
   await verificarConexionBD(); // Inicializar automáticamente las tablas al iniciar
 
   // ESTO NO SE EJECUTARÁ DURANTE LOS TESTS
-  console.log("🔄 Inicializando tablas de la base de datos...");
+  console.log("🔄 Verificando estado de la base de datos...");
   try {
-    await inicializarBaseDeDatos();
-    console.log("✅ Tablas inicializadas correctamente");
-    await crearTriggers();
+    // --- LÍNEAS ACTUALIZADAS ---
+    // await inicializarBaseDeDatos(); // COMENTADO: La BD ya está en Supabase
+    // await crearTriggers(); // COMENTADO: Los triggers ya deben estar en Supabase
+    console.log("✅ Conexión verificada. Saltando inicialización de tablas.");
+    // --- FIN DE LÍNEAS ACTUALIZADAS ---
   } catch (error) {
     console.error("❌ Error inicializando tablas:", error.message);
     console.log("💡 Puedes inicializar manualmente con: POST /api/init-db");
