@@ -96,6 +96,30 @@ class Producto {
     };
   }
 
+  toJSON() {
+    return {
+      id_producto: this.id_producto,
+      nombre: this.nombre,
+      codigo_barra: this.codigo_barra,
+      precio_compra: this.precio_compra,
+      precio_venta: this.precio_venta,
+      stock: this.stock,
+      unidad: this.unidad,
+      fecha_caducidad: this.fecha_caducidad,
+      id_proveedor: this.id_proveedor,
+      id_categoria: this.id_categoria,
+      imagen: this.imagen,
+      codigo_barras_url: this.codigo_barras_url,
+      codigo_qr_url: this.codigo_qr_url,
+      codigos_public_ids: this.codigos_public_ids,
+
+      // También puedes agregar aquí los métodos calculados si quieres
+      // Ejemplo:
+      // ganancia: this.calcularGanancia(),
+      // estado_stock: this.getEstadoStock()
+    };
+  }
+
   // ✅ NUEVO: Definir unidades como una constante estática
   static UNIDADES_PERMITIDAS = ["pieza", "kg", "lt", "unidad", "otro"];
 

@@ -1,6 +1,7 @@
 // src/repositories/productoRepository.js
 const db = require('../config/database');
 const ModelMapper = require('../utils/modelMapper');
+const QueryBuilder = require('../utils/queryBuilder');
 
 /**
  * Repositorio para manejar las operaciones de Productos en la BD.
@@ -110,7 +111,7 @@ const productoRepository = {
             'precio_compra', 'precio_venta', 'stock', 'unidad', 'fecha_caducidad', 
             'imagen', 'codigo_barras_url', 'codigo_qr_url', 'codigos_public_ids'
         ];
-        const { values, placeholders } = QueryBuilder.buildInsert(productoData, fields);
+        const { values, placeholders } = QueryBuilder.buildInsertQuery(productoData, fields);
         
         const sql = `INSERT INTO productos (${fields.join(', ')}) VALUES (${placeholders}) RETURNING *`;
         const result = await client.query(sql, values);

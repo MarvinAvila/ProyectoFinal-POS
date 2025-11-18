@@ -1,9 +1,10 @@
 // src/controllers/productoController.js
 
-const responseHelper = require("../utils/responseHelper");
-const logger = require("../utils/logger");
-const productoService = require("../services/productoService");
-// Ya no se necesitan: db, QueryBuilder, Producto, ModelMapper, helpers, BarcodeGenerator, BarcodeService, QRService
+const productoService = require('../services/productoService');
+const QueryBuilder = require('../utils/queryBuilder'); // <-- AGREGA ESTA LÍNEA
+const responseHelper = require('../utils/responseHelper');
+const Producto = require('../models/Producto');
+const logger = require('../utils/logger');
 
 /**
  * Manejador de errores centralizado
