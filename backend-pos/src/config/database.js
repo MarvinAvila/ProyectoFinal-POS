@@ -1,6 +1,5 @@
 // src/config/database.js
 const { Pool } = require("pg");
-const { URL } = require("url"); // <-- MUY IMPORTANTE
 
 // Carga dotenv solo si NO estamos en modo 'test'.
 if (process.env.NODE_ENV !== "test") {
@@ -11,36 +10,16 @@ let pool;
 
 const isTest = process.env.NODE_ENV === "test";
 
-// --- ESTE ES EL BLOQUE CORREGIDO ---
 if (process.env.DATABASE_URL) {
-  // Configuración para Render (CON FIX DE IPv4)
-  console.log("✅ Detectada DATABASE_URL, configurando pool para Render/Supabase...");
-  
-  try {
-    const dbUrl = new URL(process.env.DATABASE_URL);
-
-    pool = new Pool({
-      user: dbUrl.username,
-      password: dbUrl.password,
-      host: dbUrl.hostname,
-      port: dbUrl.port || 5432,
-      database: dbUrl.pathname.slice(1), // Quita el '/' inicial
-      ssl: { rejectUnauthorized: false },
-      
-      // --- ESTA ES LA LÍNEA MÁGICA QUE ARREGLA TODO ---
-      family: 4, // Forzar el uso de IPv4
-      // ------------------------------------------------
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    });
-
-  } catch (err) {
-    console.error("❌ Error al parsear la DATABASE_URL", err);
-    process.exit(-1);
-  }
-// --- FIN DEL BLOQUE CORREGIDO ---
-
+  // Configuración para Render (ahora usando el Pooler IPv4 de Supabase)
+  console.log("✅ Usando DATABASE_URL (Pooler de Supabase) para la conexión.");
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  });
 } else {
   // Configuración local (desarrollo o pruebas)
   console.log("✅ Usando configuración local para la BD...");
